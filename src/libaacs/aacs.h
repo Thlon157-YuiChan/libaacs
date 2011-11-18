@@ -28,6 +28,8 @@
 
 typedef struct aacs AACS;
 
+AACS_PUBLIC void aacs_get_version(int *major, int *minor, int *micro);
+
 AACS_PUBLIC AACS *aacs_open(const char *path, const char *keyfile_path);
 AACS_PUBLIC void aacs_close(AACS *aacs);
 AACS_PUBLIC void aacs_select_title(AACS *aacs, uint32_t title); /* 0 - top menu, 0xffff - first play */
