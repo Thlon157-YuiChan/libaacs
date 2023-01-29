@@ -117,12 +117,6 @@ static inline int _discid_cmp(const uint64_t *want_disc_id, const uint64_t *disc
 /* uncomment the line below for debugging */
 // int yydebug = 1;
 %}
-/* Options set to generate a reentrant parser that is POSIX yacc compatible
- * The basic 'scanner' parameters are set. Also, another parameter is set
- * to pass in a title entry list struct used to hold all title entries.
- * Most of these options are bison specific, but some BSD's have bison
- * compatibility support for these options in byacc.
- */
 %define api.pure
 %lex-param{void *scanner}
 %parse-param{void *scanner}
