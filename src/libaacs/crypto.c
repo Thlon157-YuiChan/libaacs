@@ -782,7 +782,6 @@ void crypto_create_bus_key(const uint8_t *priv_key, const uint8_t *drive_key_poi
     gcry_mpi_scan (&mpi_priv_key, GCRYMPI_FMT_USG, priv_key, 20, NULL);
 
     mpi_point_t Q;
-    point_init (&Q);
     gcry_mpi_scan (&Q.x, GCRYMPI_FMT_USG, drive_key_point,      20, NULL);
     gcry_mpi_scan (&Q.y, GCRYMPI_FMT_USG, drive_key_point + 20, 20, NULL);
     Q.z = mpi_alloc_set_ui(1);
