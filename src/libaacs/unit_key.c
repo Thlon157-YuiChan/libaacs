@@ -199,7 +199,7 @@ static int _parse_uks(AACS_UK *uk, const uint8_t *p, size_t size, int aacs2)
 
     /* alloc storage for keys */
 
-    uk->enc_uk = calloc(num_uk, sizeof(AACS_UK));
+    uk->enc_uk = calloc(num_uk, sizeof(uk->enc_uk[0]));
     if (!uk->enc_uk) {
         BD_DEBUG(DBG_UK | DBG_CRIT, "Out of memory\n");
         return -1;
