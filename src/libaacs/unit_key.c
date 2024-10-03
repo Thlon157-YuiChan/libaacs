@@ -120,7 +120,7 @@ static int _assign_titles(AACS_UK *uk, const uint8_t *p, size_t size)
         return -1;
     }
 
-    uk->title_cps_unit = calloc(sizeof(uint16_t), num_titles + 2);
+    uk->title_cps_unit = calloc(num_titles + 2, sizeof(uint16_t));
     if (!uk->title_cps_unit) {
         BD_DEBUG(DBG_UK | DBG_CRIT, "Out of memory\n");
         return -1;
