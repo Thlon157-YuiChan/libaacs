@@ -42,6 +42,12 @@
 
 char *file_get_config_home(void)
 {
+    // Check env var AACS_HOME first
+    const char *aacs_home = getenv("AACS_HOME");
+    if (aacs_home && *aacs_home) {
+        return str_dup(aacs_home);
+    }
+
     const char *xdg_home = getenv("XDG_CONFIG_HOME");
     if (xdg_home && *xdg_home) {
         return str_dup(xdg_home);
