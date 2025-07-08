@@ -128,7 +128,8 @@ int device_send_cmd(MMCDEV *mmc, const uint8_t *cmd, uint8_t *buf, size_t tx, si
         SCSICommandDescriptorBlock cdb = {0};
         memcpy(cdb, cmd, sizeof(cdb));
 
-        rc = (*task)->SetCommandDescriptorBlock(task, cdb, kSCSICDBSize_16Byte);
+        // CDB is 12 bytes long according to SCSI MMC-5 Standard
+        rc = (*task)->SetCommandDescriptorBlock(task, cdb, kSCSICDBSize_12Byte);
         if (kIOReturnSuccess != rc) {
             BD_DEBUG(DBG_MMC, "Error setting SCSI command\n");
             break;
