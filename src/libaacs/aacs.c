@@ -905,7 +905,7 @@ static void _find_config_entry(AACS *aacs, config_file *cf,
                  str_print_hex(str2, ce->entry.discid, 20), str_print_hex(str, aacs->vid, 16));
     }
 
-    if (memcmp(ce->entry.vuk, empty_key, 16)) {
+    if (!memcmp(vuk, empty_key, 16) && memcmp(ce->entry.vuk, empty_key, 16)) {
         memcpy(vuk, ce->entry.vuk, 16);
 
         BD_DEBUG(DBG_AACS, "Found volume unique key for %s: %s\n",
@@ -1041,20 +1041,21 @@ static int _calc_uks(AACS *aacs, config_file *cf)
 
     /* first try cached vuk */
     vuk_error_code = _calc_vuk(aacs, mk, vuk, NULL);
-    if (vuk_error_code != AACS_SUCCESS) {
 
-        if (cf) {
-            BD_DEBUG(DBG_AACS, "Searching for keydb config entry...\n");
-            _find_config_entry(aacs, cf, mk, vuk);
+    /* Check the config file for MK, VID, VUK and UKs */
+    if (cf) {
+        BD_DEBUG(DBG_AACS, "Searching for keydb config entry...\n");
+        _find_config_entry(aacs, cf, mk, vuk);
 
-            /* Skip if retrieved from config file */
-            if (aacs->uk->uk) {
-                return AACS_SUCCESS;
-            }
+        /* Skip if retrieved from config file */
+        if (aacs->uk->uk) {
+            return AACS_SUCCESS;
         }
 
         /* Try to calculate VUK */
-        vuk_error_code = _calc_vuk(aacs, mk, vuk, cf);
+        if (vuk_error_code != AACS_SUCCESS) {
+            vuk_error_code = _calc_vuk(aacs, mk, vuk, cf);
+        }
     }
 
     BD_DEBUG(DBG_AACS, "Calculate CPS unit keys...\n");
