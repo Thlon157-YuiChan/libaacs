@@ -20,13 +20,14 @@ build-debian:
 build-macos:
     stage: build
     tags:
-        - catalina
         - amd64
+        - macos
     script:
-        - curl -sS -O https://artifacts.videolan.org/vlc/macos-x86_64/vlc-contrib-x86_64-apple-darwin19-58c8b6aba888c666612e91d1cbb012aea630c853.tar.bz2
-        - tar xf vlc-contrib-x86_64-apple-darwin19-58c8b6aba888c666612e91d1cbb012aea630c853.tar.bz2
+        - CONTRIB_TARBALL=`curl -s https://artifacts.videolan.org/vlc/macos-x86_64/SHA512SUM 2>/dev/null | cut -d '/' -f 2`
+        - curl -sS -O https://artifacts.videolan.org/vlc/macos-x86_64/$CONTRIB_TARBALL
+        - tar xf "$CONTRIB_TARBALL"
         - cd x86_64-apple-darwin19
-        - curl -sS -o ./change_prefix.sh 'https://git.videolan.org/?p=vlc.git;a=blob_plain;f=contrib/src/change_prefix.sh;hb=HEAD'
+        - curl -sS -o ./change_prefix.sh 'https://code.videolan.org/videolan/vlc/-/raw/master/contrib/src/change_prefix.sh'
         - chmod +x ./change_prefix.sh
         - ./change_prefix.sh
         - export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:`pwd -P`/lib/pkgconfig/"
@@ -45,16 +46,16 @@ build-macos:
         expire_in: 1 week
 
 build-win64:
-    image: registry.videolan.org/vlc-debian-win64:20201106143728
+    image: registry.videolan.org/vlc-debian-win64:20240122094311
     stage: build
     tags:
         - docker
         - amd64
     script:
-        - wget -nv https://artifacts.videolan.org/vlc/win64/vlc-contrib-x86_64-w64-mingw32-45c21cd73727ddcd1af843a34dc4ca8648cc872c.tar.bz2
-        - tar xf vlc-contrib-x86_64-w64-mingw32-45c21cd73727ddcd1af843a34dc4ca8648cc872c.tar.bz2
+        - wget -nv https://artifacts.videolan.org/vlc/win64/vlc-contrib-x86_64-w64-mingw32-d0a172b90038ced119dcb82acc8e9cad121ecd3b.tar.bz2
+        - tar xf vlc-contrib-x86_64-w64-mingw32-d0a172b90038ced119dcb82acc8e9cad121ecd3b.tar.bz2
         - cd x86_64-w64-mingw32
-        - wget -nv -O ./change_prefix.sh 'https://git.videolan.org/?p=vlc.git;a=blob_plain;f=contrib/src/change_prefix.sh;hb=HEAD'
+        - wget -nv -O ./change_prefix.sh 'https://code.videolan.org/videolan/vlc/-/raw/master/contrib/src/change_prefix.sh'
         - chmod +x ./change_prefix.sh
         - ./change_prefix.sh
         - cd ..
@@ -73,16 +74,16 @@ build-win64:
         expire_in: 1 week
 
 build-win32:
-    image: registry.videolan.org/vlc-debian-win32:20201106141924
+    image: registry.videolan.org/vlc-debian-win32:20240122094311
     stage: build
     tags:
         - docker
         - amd64
     script:
-        - wget -nv https://artifacts.videolan.org/vlc/win32/vlc-contrib-i686-w64-mingw32-45c21cd73727ddcd1af843a34dc4ca8648cc872c.tar.bz2
-        - tar xf vlc-contrib-i686-w64-mingw32-45c21cd73727ddcd1af843a34dc4ca8648cc872c.tar.bz2
+        - wget -nv https://artifacts.videolan.org/vlc/win32/vlc-contrib-i686-w64-mingw32-d0a172b90038ced119dcb82acc8e9cad121ecd3b.tar.bz2
+        - tar xf vlc-contrib-i686-w64-mingw32-d0a172b90038ced119dcb82acc8e9cad121ecd3b.tar.bz2
         - cd i686-w64-mingw32
-        - wget -nv -O ./change_prefix.sh 'https://git.videolan.org/?p=vlc.git;a=blob_plain;f=contrib/src/change_prefix.sh;hb=HEAD'
+        - wget -nv -O ./change_prefix.sh 'https://code.videolan.org/videolan/vlc/-/raw/master/contrib/src/change_prefix.sh'
         - chmod +x ./change_prefix.sh
         - ./change_prefix.sh
         - cd ..
