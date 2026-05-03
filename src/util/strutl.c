@@ -246,7 +246,7 @@ char *str_get_hex_string(const char *p, int n)
 
 char *str_print_hex(char *out, const uint8_t *buf, int count)
 {
-    static const char nibble[16] = "0123456789abcdef";
+    static const char nibble[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
     int zz;
     for (zz = 0; zz < count; zz++) {
         out[zz*2    ] = nibble[(buf[zz] >> 4) & 0xf];
