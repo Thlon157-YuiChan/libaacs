@@ -100,8 +100,9 @@ AC_SYS_LARGEFILE
 dnl required libraries
 
 dnl gcrypt check
-AM_PATH_LIBGCRYPT([1.6.0], [have_gcrypt=yes])
-AS_IF([test "x$have_gcrypt" != xyes],[
+PKG_CHECK_MODULES([LIBGCRYPT], [libgcrypt >= 1.6.0], [], [
+  AM_PATH_LIBGCRYPT([1.6.0], [have_gcrypt=yes])
+  AS_IF([test "x$have_gcrypt" != xyes],[
     dnl older gcrypt requires pthread
     AM_PATH_LIBGCRYPT([1.1.94],,
                       AC_MSG_ERROR([libgcrypt not found on system]))
@@ -113,11 +114,15 @@ AS_IF([test "x$have_gcrypt" != xyes],[
             [AC_MSG_ERROR([pthread required])])
         ])
     ])
+])
 
 dnl use re-entrant version of gcrypt_error() from gpg-error
 AC_FUNC_STRERROR_R
-AM_PATH_GPG_ERROR([0.5],
+PKG_CHECK_MODULES([GPG_ERROR], [gpg-error >= 0.5],
+    [AC_DEFINE(HAVE_LIBGPG_ERROR, 1, [Define to 1 if you have the gpg-error library])],
+    [AM_PATH_GPG_ERROR([0.5],
                   AC_DEFINE(HAVE_LIBGPG_ERROR, 1, [Define to 1 if you have the gpg-error library]))
+    ])
 
 dnl aacs_info can be used with unmounted discs if libudfread is used
 PKG_CHECK_MODULES([LIBUDFREAD], [libudfread >= 1.1.0],
