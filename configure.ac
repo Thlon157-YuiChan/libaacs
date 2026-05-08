@@ -26,7 +26,6 @@ AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([foreign tar-ustar dist-bzip2 no-dist-gzip subdir-objects])
 AC_CONFIG_HEADERS(config.h)
 AM_MAINTAINER_MODE
-LT_INIT([win32-dll])
 
 dnl Enable silent rules only when available (automake 1.11 or later).
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -81,6 +80,7 @@ AC_CACHE_VAL(lt_cv_deplibs_check_method,
 
 dnl required programs
 AC_PROG_CC
+LT_INIT([win32-dll])
 AM_PROG_LEX
 AC_PROG_YACC
 
