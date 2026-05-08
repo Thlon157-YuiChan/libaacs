@@ -19,13 +19,14 @@ m4_define([lt_age],      7)
 m4_define([lt_revision], 2)
 
 dnl initialization
-AC_INIT([libaacs], aacs_version, [http://www.videolan.org/developers/libaacs.html])
+AC_INIT([libaacs],aacs_version,[http://www.videolan.org/developers/libaacs.html])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([foreign tar-ustar dist-bzip2 no-dist-gzip subdir-objects])
 AC_CONFIG_HEADERS(config.h)
 AM_MAINTAINER_MODE
+LT_INIT([win32-dll])
 
 dnl Enable silent rules only when available (automake 1.11 or later).
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -80,13 +81,8 @@ AC_CACHE_VAL(lt_cv_deplibs_check_method,
 
 dnl required programs
 AC_PROG_CC
-AC_PROG_LIBTOOL
-AC_LIBTOOL_WIN32_DLL
 AM_PROG_LEX
 AC_PROG_YACC
-
-dnl required types
-AC_TYPE_SIGNAL
 
 dnl required headers
 AC_CHECK_HEADERS([stdarg.h sys/types.h errno.h libgen.h malloc.h])
