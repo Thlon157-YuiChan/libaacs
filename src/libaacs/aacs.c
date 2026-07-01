@@ -752,6 +752,12 @@ static int _read_vid(AACS *aacs, cert_list *hcl)
         return AACS_SUCCESS;
     }
 
+    /* get cached vid */
+    if (!aacs->no_cache && keycache_find("vid", aacs->disc_id, aacs->vid, 16)) {
+        BD_DEBUG(DBG_AACS, "Using cached VID\n");
+        return AACS_SUCCESS;
+    }
+
     int error_code = _mmc_read_auth(aacs, hcl, MMC_READ_VID, aacs->vid, NULL);
     if (error_code != AACS_SUCCESS) {
         BD_DEBUG(DBG_AACS, "Error reading VID!\n");
