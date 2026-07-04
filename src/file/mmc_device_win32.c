@@ -92,20 +92,16 @@ int device_send_cmd(MMCDEV *dev, const uint8_t *cmd, uint8_t *buf, size_t tx, si
     sptd_sb.sptd.TimeOutValue    = 5;
     sptd_sb.sptd.SenseInfoOffset = sizeof(SCSI_PASS_THROUGH_DIRECT);
 
-    if (buf) {
-        if (tx) {
-            sptd_sb.sptd.DataIn = SCSI_IOCTL_DATA_OUT;
-            sptd_sb.sptd.DataTransferLength = tx;
-            sptd_sb.sptd.DataBuffer = buf;
-        } else if (rx) {
-            sptd_sb.sptd.DataIn = SCSI_IOCTL_DATA_IN;
-            sptd_sb.sptd.DataTransferLength = rx;
-            sptd_sb.sptd.DataBuffer = buf;
-        }
+    sptd_sb.sptd.DataBuffer = buf;
+    if (buf && tx) {
+        sptd_sb.sptd.DataIn = SCSI_IOCTL_DATA_OUT;
+        sptd_sb.sptd.DataTransferLength = tx;
+    } else if (buf && rx) {
+        sptd_sb.sptd.DataIn = SCSI_IOCTL_DATA_IN;
+        sptd_sb.sptd.DataTransferLength = rx;
     } else {
         sptd_sb.sptd.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
         sptd_sb.sptd.DataTransferLength = 0;
-        sptd_sb.sptd.DataBuffer = NULL;
     }
 
     memcpy(sptd_sb.sptd.Cdb, cmd, 16);

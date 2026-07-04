@@ -70,20 +70,16 @@ int device_send_cmd(MMCDEV *dev, const uint8_t *cmd, uint8_t *buf, size_t tx, si
     cgc.sense = &sense;
     cgc.timeout = 5000;
 
-    if (buf) {
-        if (tx) {
-            cgc.data_direction = CGC_DATA_WRITE;
-            cgc.buflen = tx;
-            cgc.buffer = buf;
-        } else if (rx) {
-            cgc.data_direction = CGC_DATA_READ;
-            cgc.buflen = rx;
-            cgc.buffer = buf;
-        }
+    cgc.buffer = buf;
+    if (buf && tx) {
+        cgc.data_direction = CGC_DATA_WRITE;
+        cgc.buflen = tx;
+    } else if (buf && rx) {
+        cgc.data_direction = CGC_DATA_READ;
+        cgc.buflen = rx;
     } else {
         cgc.data_direction = CGC_DATA_NONE;
         cgc.buflen = 0;
-        cgc.buffer = NULL;
     }
 
     result = ioctl(dev->fd, CDROM_SEND_PACKET, &cgc);
