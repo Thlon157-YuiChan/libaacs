@@ -707,7 +707,7 @@ int mmc_read_auth(MMC *mmc, const uint8_t *host_priv_key, const uint8_t *host_ce
 
 int mmc_read_drive_cert(MMC *mmc, uint8_t *drive_cert)
 {
-    uint8_t buf[116];
+    uint8_t buf[96];
     int crypto_error;
 
     if (mmc->drive_cert[0] == 0x01) {
@@ -719,7 +719,7 @@ int mmc_read_drive_cert(MMC *mmc, uint8_t *drive_cert)
         BD_DEBUG(DBG_MMC | DBG_CRIT, "Drive does not support reading drive certificate\n");
     }
 
-    if (!_mmc_report_key(mmc, 0, 0, 0, 0x38, buf, 116)) {
+    if (!_mmc_report_key(mmc, 0, 0, 0, 0x38, buf, 96)) {
         if (mmc->read_drive_cert) {
             BD_DEBUG(DBG_MMC | DBG_CRIT, "Failed reading drive certificate\n");
         }
