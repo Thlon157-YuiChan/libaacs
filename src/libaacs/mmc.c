@@ -87,7 +87,6 @@ static int _mmc_report_key(MMC *mmc, uint8_t agid, uint32_t addr,
 {
     uint8_t cmd[16];
     memset(cmd, 0, sizeof(cmd));
-    memset(buf, 0, len);
 
     BD_DEBUG(DBG_MMC, "MMC report key...\n");
 
@@ -130,7 +129,6 @@ static int _mmc_read_disc_structure(MMC *mmc, uint8_t agid, uint8_t format,
 {
     uint8_t cmd[16];
     memset(cmd, 0, sizeof(cmd));
-    memset(buf, 0, len);
 
     BD_DEBUG(DBG_MMC, "MMC read disc structure [format 0x%x layer %d address %d] ...\n", format, layer, address);
 
@@ -153,7 +151,6 @@ static int _mmc_get_configuration(MMC *mmc, uint16_t feature, uint8_t *buf, uint
 {
     uint8_t cmd[16];
     memset(cmd, 0, sizeof(cmd));
-    memset(buf, 0, len);
 
     BD_DEBUG(DBG_MMC, "MMC get configuration [feature 0x%x] ...\n", feature);
 
@@ -279,6 +276,7 @@ static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, int address, int *size)
     uint8_t buf[32772];
 
     *size = 0;
+    memset(buf, 0, sizeof(buf));
     if (_mmc_read_disc_structure(mmc, agid, 0x83, layer, address, buf, sizeof(buf))) {
         unsigned pack, num_packs = buf[3];
         int32_t  len = MKINT_BE16(buf) - 2;
@@ -300,6 +298,7 @@ static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, int address, int *size)
        *size += len;
 
         for (pack = 1; pack < num_packs; pack++) {
+            memset(buf, 0, sizeof(buf));
             if (_mmc_read_disc_structure(mmc, agid, 0x83, layer, pack, buf, sizeof(buf))) {
                 len = MKINT_BE16(buf) - 2;
                 BD_DEBUG(DBG_MMC, "got mkb: pack %d/%d %d bytes\n", pack, num_packs, len);
@@ -365,6 +364,7 @@ static int _mmc_read_pmsn(MMC *mmc, uint8_t agid, uint8_t *pmsn,
 static int _mmc_read_data_keys(MMC *mmc, uint8_t agid, uint8_t *read_data_key, uint8_t *write_data_key)
 {
     uint8_t buf[36];
+    memset(buf, 0, sizeof(buf));
 
     if (_mmc_read_disc_structure(mmc, agid, 0x84, 0, 0, buf, sizeof(buf))) {
         memcpy(read_data_key, buf + 4, 16);
@@ -745,6 +745,7 @@ int mmc_read_drive_cert(MMC *mmc, uint8_t *drive_cert)
         BD_DEBUG(DBG_MMC | DBG_CRIT, "Drive does not support reading drive certificate\n");
     }
 
+    memset(buf, 0, sizeof(buf));
     if (!_mmc_report_key(mmc, 0, 0, 0, 0x38, buf, sizeof(buf))) {
         if (mmc->read_drive_cert) {
             BD_DEBUG(DBG_MMC | DBG_CRIT, "Failed reading drive certificate\n");
