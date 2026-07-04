@@ -98,15 +98,15 @@ static int _mmc_send_key(MMC *mmc, uint8_t agid, uint8_t format, uint8_t *buf,
     return device_send_cmd(mmc->dev, cmd, buf, len, 0);
 }
 
-static int _mmc_report_disc_structure(MMC *mmc, uint8_t agid, uint8_t format,
-                                      uint8_t layer, uint32_t address,
-                                      uint8_t *buf, uint16_t len)
+static int _mmc_read_disc_structure(MMC *mmc, uint8_t agid, uint8_t format,
+                                    uint8_t layer, uint32_t address,
+                                    uint8_t *buf, uint16_t len)
 {
     uint8_t cmd[16];
     memset(cmd, 0, sizeof(cmd));
     memset(buf, 0, len);
 
-    BD_DEBUG(DBG_MMC, "MMC report disc structure [format 0x%x layer %d address %d] ...\n", format, layer, address);
+    BD_DEBUG(DBG_MMC, "MMC read disc structure [format 0x%x layer %d address %d] ...\n", format, layer, address);
 
     cmd[0] = 0xad; // operation code
     cmd[1] = 0x01; // BluRay
@@ -253,7 +253,7 @@ static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, int address, int *size)
     uint8_t buf[32772];
 
     *size = 0;
-    if (_mmc_report_disc_structure(mmc, agid, 0x83, layer, address, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, 0x83, layer, address, buf, sizeof(buf))) {
         unsigned pack, num_packs = buf[3];
         int32_t  len = MKINT_BE16(buf) - 2;
 
@@ -274,7 +274,7 @@ static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, int address, int *size)
        *size += len;
 
         for (pack = 1; pack < num_packs; pack++) {
-            if (_mmc_report_disc_structure(mmc, agid, 0x83, layer, pack, buf, sizeof(buf))) {
+            if (_mmc_read_disc_structure(mmc, agid, 0x83, layer, pack, buf, sizeof(buf))) {
                 len = MKINT_BE16(buf) - 2;
                 BD_DEBUG(DBG_MMC, "got mkb: pack %d/%d %d bytes\n", pack, num_packs, len);
                 if (len <= 0 || len > 32768) {
@@ -312,7 +312,7 @@ static int _mmc_read_vid(MMC *mmc, uint8_t agid, uint8_t *volume_id,
     uint8_t buf[36];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_disc_structure(mmc, agid, 0x80, 0, 0, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, 0x80, 0, 0, buf, sizeof(buf))) {
         memcpy(volume_id, buf + 4,  16);
         memcpy(mac,       buf + 20, 16);
         return 1;
@@ -327,7 +327,7 @@ static int _mmc_read_pmsn(MMC *mmc, uint8_t agid, uint8_t *pmsn,
     uint8_t buf[36];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_disc_structure(mmc, agid, 0x81, 0, 0, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, 0x81, 0, 0, buf, sizeof(buf))) {
         memcpy(pmsn, buf + 4,  16);
         memcpy(mac,  buf + 20, 16);
         return 1;
@@ -340,7 +340,7 @@ static int _mmc_read_data_keys(MMC *mmc, uint8_t agid, uint8_t *read_data_key, u
 {
     uint8_t buf[36];
 
-    if (_mmc_report_disc_structure(mmc, agid, 0x84, 0, 0, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, 0x84, 0, 0, buf, sizeof(buf))) {
         memcpy(read_data_key, buf + 4, 16);
         memcpy(write_data_key, buf + 20, 16);
         return 1;
