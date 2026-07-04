@@ -55,6 +55,32 @@ struct mmc {
  *
  */
 
+/* SCSI Multimedia Commands (MMC) operation codes */
+enum {
+    MMC_GET_CONFIGURATION = 0x46,
+    MMC_SEND_KEY = 0xa3,
+    MMC_REPORT_KEY = 0xa4,
+    MMC_READ_DISC_STRUCTURE = 0xad,
+};
+
+/* "Key Class" for MMC_REPORT_KEY and MMC_SEND_KEY */
+enum {
+    MMC_KEY_CLASS_AACS = 0x02,
+};
+
+/* "Media Type" for MMC_READ_DISC_STRUCTURE */
+enum {
+    MMC_MEDIA_TYPE_DVD    = 0x00,
+    MMC_MEDIA_TYPE_BLURAY = 0x01,
+};
+
+/* Values for MMC_GET_CONFIGURATION RT field */
+enum {
+    MMC_FEATURE_ALL_FEATURES     = 0x00,
+    MMC_FEATURE_CURRENT_FEATURES = 0x01,
+};
+
+
 static int _mmc_report_key(MMC *mmc, uint8_t agid, uint32_t addr,
                            uint8_t blocks, uint8_t format, uint8_t *buf,
                            uint16_t len)
@@ -65,13 +91,13 @@ static int _mmc_report_key(MMC *mmc, uint8_t agid, uint32_t addr,
 
     BD_DEBUG(DBG_MMC, "MMC report key...\n");
 
-    cmd[0] = 0xa4;
+    cmd[0] = MMC_REPORT_KEY;
     cmd[2] = (addr >> 24) & 0xff;
     cmd[3] = (addr >> 16) & 0xff;
     cmd[4] = (addr >> 8) & 0xff;
     cmd[5] = addr & 0xff;
     cmd[6] = blocks;
-    cmd[7] = 0x02;
+    cmd[7] = MMC_KEY_CLASS_AACS;
     cmd[8] = (len >> 8) & 0xff;
     cmd[9] = len & 0xff;
     cmd[10] = (agid << 6) | (format & 0x3f);
@@ -88,8 +114,8 @@ static int _mmc_send_key(MMC *mmc, uint8_t agid, uint8_t format, uint8_t *buf,
 
     BD_DEBUG(DBG_MMC, "MMC send key [%d] %s...\n", len, str_print_hex(str, buf, len));
 
-    cmd[0] = 0xa3;
-    cmd[7] = 0x02;
+    cmd[0] = MMC_SEND_KEY;
+    cmd[7] = MMC_KEY_CLASS_AACS;
     cmd[8] = (len >> 8) & 0xff;
     cmd[9] = len & 0xff;
     cmd[10] = (agid << 6) | (format & 0x3f);
@@ -108,8 +134,8 @@ static int _mmc_read_disc_structure(MMC *mmc, uint8_t agid, uint8_t format,
 
     BD_DEBUG(DBG_MMC, "MMC read disc structure [format 0x%x layer %d address %d] ...\n", format, layer, address);
 
-    cmd[0] = 0xad; // operation code
-    cmd[1] = 0x01; // BluRay
+    cmd[0] = MMC_READ_DISC_STRUCTURE;
+    cmd[1] = (MMC_MEDIA_TYPE_BLURAY) & 0x0f;
     cmd[2] = (address >> 24) & 0xff;
     cmd[3] = (address >> 16) & 0xff;
     cmd[4] = (address >> 8) & 0xff;
@@ -131,8 +157,8 @@ static int _mmc_get_configuration(MMC *mmc, uint16_t feature, uint8_t *buf, uint
 
     BD_DEBUG(DBG_MMC, "MMC get configuration [feature 0x%x] ...\n", feature);
 
-    cmd[0] = 0x46; // operation code
-    cmd[1] = 0x01; // BluRay
+    cmd[0] = MMC_GET_CONFIGURATION;
+    cmd[1] = (MMC_FEATURE_CURRENT_FEATURES) & 0x03;
     cmd[2] = (feature >> 8) & 0xff;
     cmd[3] = feature & 0xff;
     cmd[7] = (len >> 8) & 0xff;
