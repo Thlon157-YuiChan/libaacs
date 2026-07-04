@@ -150,7 +150,7 @@ static int _mmc_invalidate_agid(MMC *mmc, uint8_t agid)
     uint8_t buf[2];
     memset(buf, 0, sizeof(buf));
 
-    return _mmc_report_key(mmc, agid, 0, 0, 0x3f, buf, 2);
+    return _mmc_report_key(mmc, agid, 0, 0, 0x3f, buf, sizeof(buf));
 }
 
 static void _mmc_invalidate_agids(MMC *mmc)
@@ -168,7 +168,7 @@ static int _mmc_report_agid(MMC *mmc, uint8_t *agid)
     uint8_t buf[8];
     memset(buf, 0, sizeof(buf));
 
-    int result = _mmc_report_key(mmc, 0, 0, 0, 0, buf, 8);
+    int result = _mmc_report_key(mmc, 0, 0, 0, 0, buf, sizeof(buf));
     if (result) {
         *agid = (buf[7] & 0xff) >> 6;
     }
@@ -186,7 +186,7 @@ static int _mmc_send_host_cert(MMC *mmc, uint8_t agid,
     memcpy(buf + 4,  host_nonce, 20);
     memcpy(buf + 24, host_cert,  92);
 
-    return _mmc_send_key(mmc, agid, 0x01, buf, 116);
+    return _mmc_send_key(mmc, agid, 0x01, buf, sizeof(buf));
 }
 
 static int _mmc_read_drive_cert_challenge(MMC *mmc, uint8_t agid, uint8_t *drive_nonce,
@@ -195,7 +195,7 @@ static int _mmc_read_drive_cert_challenge(MMC *mmc, uint8_t agid, uint8_t *drive
     uint8_t buf[116];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_key(mmc, agid, 0, 0, 0x01, buf, 116)) {
+    if (_mmc_report_key(mmc, agid, 0, 0, 0x01, buf, sizeof(buf))) {
         memcpy(drive_nonce, buf + 4,  20);
         memcpy(drive_cert,  buf + 24, 92);
         return 1;
@@ -209,7 +209,7 @@ static int _mmc_read_drive_key(MMC *mmc, uint8_t agid, uint8_t *drive_key_point,
     uint8_t buf[84];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_key(mmc, agid, 0, 0, 0x02, buf, 84)) {
+    if (_mmc_report_key(mmc, agid, 0, 0, 0x02, buf, sizeof(buf))) {
         memcpy(drive_key_point,     buf + 4,  40);
         memcpy(drive_key_signature, buf + 44, 40);
         return 1;
@@ -223,7 +223,7 @@ static int _mmc_check_aacs(MMC *mmc)
     uint8_t buf[16];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_get_configuration(mmc, 0x010d, buf, 16)) {
+    if (_mmc_get_configuration(mmc, 0x010d, buf, sizeof(buf))) {
         uint16_t feature = MKINT_BE16(buf+8);
         if (feature == 0x010d) {
             mmc->read_drive_cert = !!(buf[4+8] & 0x10);
@@ -303,7 +303,7 @@ static int _mmc_send_host_key(MMC *mmc, uint8_t agid,
     memcpy(buf + 4,  host_key_point,     40);
     memcpy(buf + 44, host_key_signature, 40);
 
-    return _mmc_send_key(mmc, agid, 0x02, buf, 84);
+    return _mmc_send_key(mmc, agid, 0x02, buf, sizeof(buf));
 }
 
 static int _mmc_read_vid(MMC *mmc, uint8_t agid, uint8_t *volume_id,
@@ -312,7 +312,7 @@ static int _mmc_read_vid(MMC *mmc, uint8_t agid, uint8_t *volume_id,
     uint8_t buf[36];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_disc_structure(mmc, agid, 0x80, 0, 0, buf, 36)) {
+    if (_mmc_report_disc_structure(mmc, agid, 0x80, 0, 0, buf, sizeof(buf))) {
         memcpy(volume_id, buf + 4,  16);
         memcpy(mac,       buf + 20, 16);
         return 1;
@@ -327,7 +327,7 @@ static int _mmc_read_pmsn(MMC *mmc, uint8_t agid, uint8_t *pmsn,
     uint8_t buf[36];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_disc_structure(mmc, agid, 0x81, 0, 0, buf, 36)) {
+    if (_mmc_report_disc_structure(mmc, agid, 0x81, 0, 0, buf, sizeof(buf))) {
         memcpy(pmsn, buf + 4,  16);
         memcpy(mac,  buf + 20, 16);
         return 1;
@@ -340,7 +340,7 @@ static int _mmc_read_data_keys(MMC *mmc, uint8_t agid, uint8_t *read_data_key, u
 {
     uint8_t buf[36];
 
-    if (_mmc_report_disc_structure(mmc, agid, 0x84, 0, 0, buf, 36)) {
+    if (_mmc_report_disc_structure(mmc, agid, 0x84, 0, 0, buf, sizeof(buf))) {
         memcpy(read_data_key, buf + 4, 16);
         memcpy(write_data_key, buf + 20, 16);
         return 1;
@@ -719,7 +719,7 @@ int mmc_read_drive_cert(MMC *mmc, uint8_t *drive_cert)
         BD_DEBUG(DBG_MMC | DBG_CRIT, "Drive does not support reading drive certificate\n");
     }
 
-    if (!_mmc_report_key(mmc, 0, 0, 0, 0x38, buf, 96)) {
+    if (!_mmc_report_key(mmc, 0, 0, 0, 0x38, buf, sizeof(buf))) {
         if (mmc->read_drive_cert) {
             BD_DEBUG(DBG_MMC | DBG_CRIT, "Failed reading drive certificate\n");
         }
