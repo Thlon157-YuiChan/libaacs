@@ -254,7 +254,7 @@ AACS_UK *uk_parse(const void *data, size_t len, int aacs2)
 
     if (_parse(uk, data, len, aacs2) < 0) {
         BD_DEBUG(DBG_UK | DBG_CRIT, "Corrupt unit key file (AACS/Unit_Key_RO.inf)\n");
-        X_FREE(uk);
+        uk_free(&uk);
     }
 
     return uk;
