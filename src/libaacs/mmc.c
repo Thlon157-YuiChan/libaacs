@@ -80,6 +80,34 @@ enum {
     MMC_FEATURE_CURRENT_FEATURES = 0x01,
 };
 
+/* Features for MMC_GET_CONFIGURATION */
+typedef enum {
+    MMC_FEATURE_AACS = 0x010d,
+} MMC_GET_CONFIGURATION_feature;
+
+/* Data formats for MMC_REPORT_KEY, key class AACS */
+typedef enum {
+    MMC_REPORT_KEY_AACS_AGID                 = 0x00,
+    MMC_REPORT_KEY_AACS_DRIVE_CERT_CHALLENGE = 0x01,
+    MMC_REPORT_KEY_AACS_DRIVE_KEY            = 0x02,
+    MMC_REPORT_KEY_AACS_DRIVE_CERTIFICATE    = 0x38,
+    MMC_REPORT_KEY_AACS_INVALIDATE_AGID      = 0x3f,
+} MMC_REPORT_KEY_format_aacs;
+
+/* Data formats for MMC_SEND_KEY, key class AACS */
+typedef enum {
+    MMC_SEND_KEY_AACS_HOST_CERT_CHALLENGE = 0x01,
+    MMC_SEND_KEY_AACS_HOST_KEY            = 0x02,
+    MMC_SEND_KEY_AACS_INVALIDATE_AGID     = 0x3f,
+} MMC_SEND_KEY_format_aacs;
+
+/* Data formats for MMC_READ_DISC_STRUCTURE, media type BluRay */
+typedef enum {
+    MMC_READ_DISC_STRUCTURE_BLURAY_VOLUME_ID = 0x80,
+    MMC_READ_DISC_STRUCTURE_BLURAY_PMSN      = 0x81,
+    MMC_READ_DISC_STRUCTURE_BLURAY_MKB       = 0x83,  /* From Lead In */
+    MMC_READ_DISC_STRUCTURE_BLURAY_DATA_KEYS = 0x84,
+} MMC_READ_DISC_STRUCTURE_format_bluray;
 
 static int _mmc_report_key(MMC *mmc, uint8_t agid, uint32_t addr,
                            uint8_t blocks, uint8_t format, uint8_t *buf,
@@ -165,7 +193,7 @@ static int _mmc_get_configuration(MMC *mmc, uint16_t feature, uint8_t *buf, uint
 }
 
 /*
- *
+ * AGID (Authentication Grant IDentifier)
  */
 
 static int _mmc_invalidate_agid(MMC *mmc, uint8_t agid)
@@ -173,7 +201,7 @@ static int _mmc_invalidate_agid(MMC *mmc, uint8_t agid)
     uint8_t buf[2];
     memset(buf, 0, sizeof(buf));
 
-    return _mmc_report_key(mmc, agid, 0, 0, 0x3f, buf, sizeof(buf));
+    return _mmc_report_key(mmc, agid, 0, 0, MMC_REPORT_KEY_AACS_INVALIDATE_AGID, buf, sizeof(buf));
 }
 
 static void _mmc_invalidate_agids(MMC *mmc)
@@ -191,12 +219,16 @@ static int _mmc_report_agid(MMC *mmc, uint8_t *agid)
     uint8_t buf[8];
     memset(buf, 0, sizeof(buf));
 
-    int result = _mmc_report_key(mmc, 0, 0, 0, 0, buf, sizeof(buf));
+    int result = _mmc_report_key(mmc, 0, 0, 0, MMC_REPORT_KEY_AACS_AGID, buf, sizeof(buf));
     if (result) {
         *agid = (buf[7] & 0xff) >> 6;
     }
     return result;
 }
+
+/*
+ *
+ */
 
 static int _mmc_send_host_cert(MMC *mmc, uint8_t agid,
                                const uint8_t *host_nonce,
@@ -209,7 +241,7 @@ static int _mmc_send_host_cert(MMC *mmc, uint8_t agid,
     memcpy(buf + 4,  host_nonce, 20);
     memcpy(buf + 24, host_cert,  92);
 
-    return _mmc_send_key(mmc, agid, 0x01, buf, sizeof(buf));
+    return _mmc_send_key(mmc, agid, MMC_SEND_KEY_AACS_HOST_CERT_CHALLENGE, buf, sizeof(buf));
 }
 
 static int _mmc_read_drive_cert_challenge(MMC *mmc, uint8_t agid, uint8_t *drive_nonce,
@@ -218,7 +250,7 @@ static int _mmc_read_drive_cert_challenge(MMC *mmc, uint8_t agid, uint8_t *drive
     uint8_t buf[116];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_key(mmc, agid, 0, 0, 0x01, buf, sizeof(buf))) {
+    if (_mmc_report_key(mmc, agid, 0, 0, MMC_REPORT_KEY_AACS_DRIVE_CERT_CHALLENGE, buf, sizeof(buf))) {
         memcpy(drive_nonce, buf + 4,  20);
         memcpy(drive_cert,  buf + 24, 92);
         return 1;
@@ -232,7 +264,7 @@ static int _mmc_read_drive_key(MMC *mmc, uint8_t agid, uint8_t *drive_key_point,
     uint8_t buf[84];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_report_key(mmc, agid, 0, 0, 0x02, buf, sizeof(buf))) {
+    if (_mmc_report_key(mmc, agid, 0, 0, MMC_REPORT_KEY_AACS_DRIVE_KEY, buf, sizeof(buf))) {
         memcpy(drive_key_point,     buf + 4,  40);
         memcpy(drive_key_signature, buf + 44, 40);
         return 1;
@@ -246,9 +278,10 @@ static int _mmc_check_aacs(MMC *mmc)
     uint8_t buf[16];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_get_configuration(mmc, 0x010d, buf, sizeof(buf))) {
+    if (_mmc_get_configuration(mmc, MMC_FEATURE_AACS, buf, sizeof(buf))) {
+        /* first eature descriptor at offset 8 */
         uint16_t feature = MKINT_BE16(buf+8);
-        if (feature == 0x010d) {
+        if (feature == MMC_FEATURE_AACS) {
             mmc->read_drive_cert = !!(buf[4+8] & 0x10);
             mmc->aacs_version = buf[7+8];
             BD_DEBUG(DBG_MMC, "AACS feature descriptor:\n");
@@ -277,7 +310,7 @@ static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, int address, int *size)
 
     *size = 0;
     memset(buf, 0, sizeof(buf));
-    if (_mmc_read_disc_structure(mmc, agid, 0x83, layer, address, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, MMC_READ_DISC_STRUCTURE_BLURAY_MKB, layer, address, buf, sizeof(buf))) {
         unsigned pack, num_packs = buf[3];
         int32_t  len = MKINT_BE16(buf) - 2;
 
@@ -299,7 +332,7 @@ static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, int address, int *size)
 
         for (pack = 1; pack < num_packs; pack++) {
             memset(buf, 0, sizeof(buf));
-            if (_mmc_read_disc_structure(mmc, agid, 0x83, layer, pack, buf, sizeof(buf))) {
+            if (_mmc_read_disc_structure(mmc, agid, MMC_READ_DISC_STRUCTURE_BLURAY_MKB, layer, pack, buf, sizeof(buf))) {
                 len = MKINT_BE16(buf) - 2;
                 BD_DEBUG(DBG_MMC, "got mkb: pack %d/%d %d bytes\n", pack, num_packs, len);
                 if (len <= 0 || len > 32768) {
@@ -328,7 +361,7 @@ static int _mmc_send_host_key(MMC *mmc, uint8_t agid,
     memcpy(buf + 4,  host_key_point,     40);
     memcpy(buf + 44, host_key_signature, 40);
 
-    return _mmc_send_key(mmc, agid, 0x02, buf, sizeof(buf));
+    return _mmc_send_key(mmc, agid, MMC_SEND_KEY_AACS_HOST_KEY, buf, sizeof(buf));
 }
 
 static int _mmc_read_vid(MMC *mmc, uint8_t agid, uint8_t *volume_id,
@@ -337,7 +370,7 @@ static int _mmc_read_vid(MMC *mmc, uint8_t agid, uint8_t *volume_id,
     uint8_t buf[36];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_read_disc_structure(mmc, agid, 0x80, 0, 0, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, MMC_READ_DISC_STRUCTURE_BLURAY_VOLUME_ID, 0, 0, buf, sizeof(buf))) {
         memcpy(volume_id, buf + 4,  16);
         memcpy(mac,       buf + 20, 16);
         return 1;
@@ -352,7 +385,7 @@ static int _mmc_read_pmsn(MMC *mmc, uint8_t agid, uint8_t *pmsn,
     uint8_t buf[36];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_read_disc_structure(mmc, agid, 0x81, 0, 0, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, MMC_READ_DISC_STRUCTURE_BLURAY_PMSN, 0, 0, buf, sizeof(buf))) {
         memcpy(pmsn, buf + 4,  16);
         memcpy(mac,  buf + 20, 16);
         return 1;
@@ -366,7 +399,7 @@ static int _mmc_read_data_keys(MMC *mmc, uint8_t agid, uint8_t *read_data_key, u
     uint8_t buf[36];
     memset(buf, 0, sizeof(buf));
 
-    if (_mmc_read_disc_structure(mmc, agid, 0x84, 0, 0, buf, sizeof(buf))) {
+    if (_mmc_read_disc_structure(mmc, agid, MMC_READ_DISC_STRUCTURE_BLURAY_DATA_KEYS, 0, 0, buf, sizeof(buf))) {
         memcpy(read_data_key, buf + 4, 16);
         memcpy(write_data_key, buf + 20, 16);
         return 1;
@@ -746,7 +779,7 @@ int mmc_read_drive_cert(MMC *mmc, uint8_t *drive_cert)
     }
 
     memset(buf, 0, sizeof(buf));
-    if (!_mmc_report_key(mmc, 0, 0, 0, 0x38, buf, sizeof(buf))) {
+    if (!_mmc_report_key(mmc, 0, 0, 0, MMC_REPORT_KEY_AACS_DRIVE_CERTIFICATE, buf, sizeof(buf))) {
         if (mmc->read_drive_cert) {
             BD_DEBUG(DBG_MMC | DBG_CRIT, "Failed reading drive certificate\n");
         }
