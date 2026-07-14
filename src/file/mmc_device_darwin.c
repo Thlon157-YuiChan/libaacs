@@ -126,7 +126,7 @@ int device_send_cmd(MMCDEV *mmc, const uint8_t *cmd, uint8_t *buf, size_t tx, si
         }
 
         SCSICommandDescriptorBlock cdb = {0};
-        memcpy(cdb, cmd, sizeof(cdb));
+        memcpy(cdb, cmd, MMC_CDB_SIZE);
 
         // CDB is 12 bytes long according to SCSI MMC-5 Standard
         rc = (*task)->SetCommandDescriptorBlock(task, cdb, kSCSICDBSize_12Byte);
@@ -152,7 +152,7 @@ int device_send_cmd(MMCDEV *mmc, const uint8_t *cmd, uint8_t *buf, size_t tx, si
         rc = (*task)->ExecuteTaskSync(task, &sense, &status, &sent);
 
         char str[512];
-        BD_DEBUG(DBG_MMC, "Send SCSI MMC cmd %s:\n", str_print_hex(str, cmd, 16));
+        BD_DEBUG(DBG_MMC, "Send SCSI MMC cmd %s:\n", str_print_hex(str, cmd, MMC_CDB_SIZE));
         if (tx) {
             BD_DEBUG(DBG_MMC, "  Buffer: %s ->\n", str_print_hex(str, buf, tx>255?255:tx));
         } else {

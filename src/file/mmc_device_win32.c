@@ -61,6 +61,9 @@ typedef struct _SCSI_PASS_THROUGH_DIRECT {
     UCHAR  Cdb[16];
 } SCSI_PASS_THROUGH_DIRECT, *PSCSI_PASS_THROUGH_DIRECT;
 
+#if MMC_CDB_SIZE > 16
+#  error MMC_CDB_SIZE > 16
+#endif
 
 /*
  *
@@ -87,7 +90,7 @@ int device_send_cmd(MMCDEV *dev, const uint8_t *cmd, uint8_t *buf, size_t tx, si
     sptd_sb.sptd.PathId          = 0;
     sptd_sb.sptd.TargetId        = 0;
     sptd_sb.sptd.Lun             = 0;
-    sptd_sb.sptd.CdbLength       = 12;
+    sptd_sb.sptd.CdbLength       = MMC_CDB_SIZE;
     sptd_sb.sptd.SenseInfoLength = MAX_SENSE_LEN;
     sptd_sb.sptd.TimeOutValue    = 5;
     sptd_sb.sptd.SenseInfoOffset = sizeof(SCSI_PASS_THROUGH_DIRECT);
@@ -104,7 +107,8 @@ int device_send_cmd(MMCDEV *dev, const uint8_t *cmd, uint8_t *buf, size_t tx, si
         sptd_sb.sptd.DataTransferLength = 0;
     }
 
-    memcpy(sptd_sb.sptd.Cdb, cmd, 16);
+    ZeroMemory(sptd_sb.SenseBuf, 16);
+    memcpy(sptd_sb.sptd.Cdb, cmd, MMC_CDB_SIZE);
 
     ZeroMemory(sptd_sb.SenseBuf, MAX_SENSE_LEN);
 

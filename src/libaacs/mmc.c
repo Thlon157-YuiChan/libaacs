@@ -113,7 +113,7 @@ static int _mmc_report_key(MMC *mmc, uint8_t agid, uint32_t addr,
                            uint8_t blocks, uint8_t format, uint8_t *buf,
                            uint16_t len)
 {
-    uint8_t cmd[16];
+    uint8_t cmd[MMC_CDB_SIZE];
     memset(cmd, 0, sizeof(cmd));
 
     BD_DEBUG(DBG_MMC, "MMC report key...\n");
@@ -135,7 +135,7 @@ static int _mmc_report_key(MMC *mmc, uint8_t agid, uint32_t addr,
 static int _mmc_send_key(MMC *mmc, uint8_t agid, uint8_t format, uint8_t *buf,
                          uint16_t len)
 {
-    uint8_t cmd[16];
+    uint8_t cmd[MMC_CDB_SIZE];
     char str[512];
     memset(cmd, 0, sizeof(cmd));
 
@@ -155,7 +155,7 @@ static int _mmc_read_disc_structure(MMC *mmc, uint8_t agid, uint8_t format,
                                     uint8_t layer, uint32_t address,
                                     uint8_t *buf, uint16_t len)
 {
-    uint8_t cmd[16];
+    uint8_t cmd[MMC_CDB_SIZE];
     memset(cmd, 0, sizeof(cmd));
 
     BD_DEBUG(DBG_MMC, "MMC read disc structure [format 0x%x layer %d address %d] ...\n", format, layer, address);
@@ -177,7 +177,7 @@ static int _mmc_read_disc_structure(MMC *mmc, uint8_t agid, uint8_t format,
 
 static int _mmc_get_configuration(MMC *mmc, uint16_t feature, uint8_t *buf, uint16_t len)
 {
-    uint8_t cmd[16];
+    uint8_t cmd[MMC_CDB_SIZE];
     memset(cmd, 0, sizeof(cmd));
 
     BD_DEBUG(DBG_MMC, "MMC get configuration [feature 0x%x] ...\n", feature);

@@ -48,6 +48,9 @@
 #include <linux/cdrom.h>
 #endif
 
+#if CDROM_PACKET_SIZE > MMC_CDB_SIZE
+#  error CDROM_PACKET_SIZE > MMC_CDB_SIZE
+#endif
 
 /*
  *
@@ -84,7 +87,7 @@ int device_send_cmd(MMCDEV *dev, const uint8_t *cmd, uint8_t *buf, size_t tx, si
 
     result = ioctl(dev->fd, CDROM_SEND_PACKET, &cgc);
 
-    BD_DEBUG(DBG_MMC, "Send LINUX MMC cmd %s:\n", str_print_hex(str, cmd, 16));
+    BD_DEBUG(DBG_MMC, "Send LINUX MMC cmd %s:\n", str_print_hex(str, cmd, MMC_CDB_SIZE));
     if (buf) {
     if (tx) {
         BD_DEBUG(DBG_MMC, "  Buffer: %s ->\n", str_print_hex(str, buf, tx>255?255:tx));

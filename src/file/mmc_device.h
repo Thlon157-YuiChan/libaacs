@@ -28,6 +28,8 @@
 
 typedef struct mmcdev MMCDEV;
 
+#define MMC_CDB_SIZE (12)
+
 BD_PRIVATE MMCDEV *device_open(const char *path);
 BD_PRIVATE void    device_close(MMCDEV **mmc);
 
