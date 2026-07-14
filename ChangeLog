@@ -1,3 +1,18 @@
+2026-07-14: Version 0.12.0
+- Add aacs2_get_bdj_root_cert_hash().
+- Add a tool to dump the content of a CCI file.
+- Allow overriding the configuration directory with the AACS_HOME environment variable.
+- aacs_info: add support for unmounted discs.
+- Honor the configfile_path parameter when reading MK and VID.
+- Error out on discs using an unsupported AACS version (AACS_ERROR_UNSUPPORTED_DISC).
+- Improve error handling and resilience (key derivation, MMC and cache errors).
+- Fix several memory leaks.
+- Fix incorrect memory allocation for encrypted unit keys.
+- Fix reading drive certificate with some drives.
+- macOS: fix incorrect CDB length parameter.
+- Prefer pkg-config when detecting libgcrypt and gpg-error.
+- Fix Windows linking and out-of-source builds.
+
 2022-02-27: Version 0.11.1
 - Faster start with MacOS when disc does not use bus encryption.
 - Improve error logging.
