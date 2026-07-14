@@ -130,18 +130,25 @@ int crypto_init()
     static int crypto_init_check = 0;
 
     if (!crypto_init_check) {
-        crypto_init_check = 1;
 #ifdef HAVE_PTHREAD_H
 # if GCRYPT_VERSION_NUMBER < 0x010600
         gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
 # endif
 #endif
         if (!gcry_check_version(GCRYPT_VERSION)) {
-            crypto_init_check = 0;
+            BD_DEBUG(DBG_AACS | DBG_CRIT, "libgcrypt version is too old (need %s, have %s)\n",
+                     GCRYPT_VERSION, gcry_check_version (NULL));
+            return 0;
         }
         if(GCRYPT_DEBUG) {
             gcry_control(GCRYCTL_SET_DEBUG_FLAGS, 3);
         }
+        /* Check for SHA1 (gcry_md_hash_buffer() will abort if algorithm is not available) */
+        if (gcry_md_test_algo(GCRY_MD_SHA1)) {
+            BD_DEBUG(DBG_AACS | DBG_CRIT, "libgcrypt does not support SHA1\n");
+            return 0;
+        }
+        crypto_init_check = 1;
     }
 
     return crypto_init_check;
