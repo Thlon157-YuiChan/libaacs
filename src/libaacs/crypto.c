@@ -194,19 +194,11 @@ int crypto_aes128d(const uint8_t *key, const uint8_t *data, uint8_t *dst)
 
 int crypto_aesg3(const uint8_t *D, uint8_t *lsubk, uint8_t* rsubk, uint8_t *pk)
 {
-    int err1 = 0, err2 = 0, err3 = 0;
+    int err1, err2, err3;
 
-    if (lsubk) {
-        err1 = _aesg3(D, lsubk, 0);
-    }
-
-    if (pk) {
-        err2 = _aesg3(D, pk, 1);
-    }
-
-    if (rsubk) {
-        err3 = _aesg3(D, rsubk, 2);
-    }
+    err1 = _aesg3(D, lsubk, 0);
+    err2 = _aesg3(D, pk, 1);
+    err3 = _aesg3(D, rsubk, 2);
 
     return err1 ? err1 : err2 ? err2 : err3;
 }
