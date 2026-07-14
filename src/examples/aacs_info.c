@@ -76,13 +76,16 @@ int main (int argc, char **argv)
 #ifdef USE_UDF
     void *udf;
 #endif
-    int show_rl = 0;
+    int show_rl = 0, silent = 0;
 
     /* parse arguments */
 
     while (argc > 1) {
         if (!strcmp(argv[1], "-r")) {
             show_rl = 1;
+        } else if (!strcmp(argv[1], "-s")) {
+            setenv("AACS_DEBUG_MASK", "0", 1);
+            silent = 1;
         } else {
             break;
         }
@@ -92,8 +95,9 @@ int main (int argc, char **argv)
 
     if (argc < 2) {
         fprintf(stderr,
-                "Usage: aacs_info [-r] <path-to-disc-root> [<path-to-config-file>]\n"
+                "Usage: aacs_info [-r] [-s] <path-to-disc-root> [<path-to-config-file>]\n"
                 "    -r    show cached revocation lists\n"
+                "    -s    silent mode\n"
                 );
         exit(EXIT_FAILURE);
     }
@@ -132,14 +136,19 @@ int main (int argc, char **argv)
     const uint8_t *cc_id      = aacs_get_content_cert_id(aacs);
     char           s[65];
 
+    if (!silent || id)
     printf("Disc ID: %s\n", id  ? _hex2str(s, id,  20) : "???");
+    if (!silent || vid)
     printf("VID    : %s\n", vid ? _hex2str(s, vid, 16) : "???");
+    if (!silent || mk)
     printf("MK     : %s\n", mk  ? _hex2str(s, mk, 16) : "???");
     printf("MKBv   : %d\n", aacs_get_mkb_version(aacs));
+    if (!silent || pmsn)
     printf("PMSN   : %s\n", pmsn ? _hex2str(s, pmsn, 16) : "???");
     printf("Bus encryption:\n");
     printf("  Device support:   %s\n", (bec & AACS_BUS_ENCRYPTION_CAPABLE) ? "yes" : "no");
     printf("  Enabled in media: %s\n", (bec & AACS_BUS_ENCRYPTION_ENABLED) ? "yes" : "no");
+    if (!silent || cc_id)
     printf("Content Certificate ID: %s\n", cc_id      ? _hex2str(s, cc_id,      6)  : "???");
     if (bdj_hash)
     printf("BD-J Root Cert hash:    %s (SHA1)\n", _hex2str(s, bdj_hash, 20));
