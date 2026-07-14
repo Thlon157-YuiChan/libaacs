@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(HAVE_LIBUDFREAD) && !defined(_WIN32)
 #  include "udf_fs.h"
@@ -75,9 +76,25 @@ int main (int argc, char **argv)
 #ifdef USE_UDF
     void *udf;
 #endif
+    int show_rl = 0;
+
+    /* parse arguments */
+
+    while (argc > 1) {
+        if (!strcmp(argv[1], "-r")) {
+            show_rl = 1;
+        } else {
+            break;
+        }
+        argv++;
+        argc--;
+    }
 
     if (argc < 2) {
-        fprintf(stderr, "Usage: aacs_info <path-to-disc-root> [<path-to-config-file>]\n");
+        fprintf(stderr,
+                "Usage: aacs_info [-r] <path-to-disc-root> [<path-to-config-file>]\n"
+                "    -r    show cached revocation lists\n"
+                );
         exit(EXIT_FAILURE);
     }
 
@@ -132,23 +149,25 @@ int main (int argc, char **argv)
 
 
     aacs_close(aacs);
-
-    /* dump revocation lists */
-
-    AACS_RL_ENTRY *rl;
-    int num_entries, mkb_version;
-
-    rl = aacs_get_hrl(&num_entries, &mkb_version);
-    _dump_rl("Host", rl, num_entries, mkb_version);
-    aacs_free_rl(&rl);
-
-    rl = aacs_get_drl(&num_entries, &mkb_version);
-    _dump_rl("Drive", rl, num_entries, mkb_version);
-    aacs_free_rl(&rl);
-
 #ifdef USE_UDF
     close_udf(udf);
 #endif
+
+
+    /* dump revocation lists */
+
+    if (show_rl) {
+        AACS_RL_ENTRY *rl;
+        int num_entries, mkb_version;
+
+        rl = aacs_get_hrl(&num_entries, &mkb_version);
+        _dump_rl("Host", rl, num_entries, mkb_version);
+        aacs_free_rl(&rl);
+
+        rl = aacs_get_drl(&num_entries, &mkb_version);
+        _dump_rl("Drive", rl, num_entries, mkb_version);
+        aacs_free_rl(&rl);
+    }
 
     return EXIT_SUCCESS;
 }
