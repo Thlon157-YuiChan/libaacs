@@ -525,15 +525,6 @@ static int _read_read_data_key(AACS *aacs)
     return error_code;
 }
 
-static int _read_pmsn(AACS *aacs)
-{
-    int error_code = _mmc_read_auth(aacs, MMC_READ_PMSN, aacs->pmsn, NULL);
-    if (error_code != AACS_SUCCESS) {
-        BD_DEBUG(DBG_AACS, "Error reading PMSN!\n");
-    }
-    return error_code;
-}
-
 /*
  * Unit key calculation
  */
@@ -1240,44 +1231,25 @@ const uint8_t *aacs2_get_bdj_root_cert_hash(AACS *aacs)
 
 const uint8_t *aacs_get_mk(AACS *aacs)
 {
-    if (!memcmp(aacs->mk, empty_key, sizeof(aacs->mk))) {
-        _calc_mk(aacs);
-
-        if (!memcmp(aacs->mk, empty_key, sizeof(aacs->mk))) {
-            BD_DEBUG(DBG_AACS | DBG_CRIT, "aacs_get_mk() failed\n");
-            return NULL;
-        }
+    if (_calc_mk(aacs) == AACS_SUCCESS) {
+        return aacs->mk;
     }
-
-    return aacs->mk;
+    return NULL;
 }
 
 const uint8_t *aacs_get_vid(AACS *aacs)
 {
-    if (!memcmp(aacs->vid, empty_key, sizeof(aacs->vid))) {
-        /* get cached vid */
-        if (!aacs->no_cache && keycache_find("vid", aacs->disc_id, aacs->vid, 16)) {
-            BD_DEBUG(DBG_AACS, "Using cached VID\n");
-            return aacs->vid;
-        }
-
-        _read_vid(aacs);
-
-        if (!memcmp(aacs->vid, empty_key, sizeof(aacs->vid))) {
-            BD_DEBUG(DBG_AACS | DBG_CRIT, "aacs_get_vid() failed\n");
-            return NULL;
-        }
+    if (_read_vid(aacs) == AACS_SUCCESS) {
+        return aacs->vid;
     }
-
-    return aacs->vid;
+    return NULL;
 }
 
 const uint8_t *aacs_get_pmsn(AACS *aacs)
 {
     if (!memcmp(aacs->pmsn, empty_key, sizeof(aacs->pmsn))) {
-        _read_pmsn(aacs);
-
-        if (!memcmp(aacs->pmsn, empty_key, sizeof(aacs->pmsn))) {
+        int error_code = _mmc_read_auth(aacs, MMC_READ_PMSN, aacs->pmsn, NULL);
+        if (error_code != AACS_SUCCESS) {
             BD_DEBUG(DBG_AACS, "aacs_get_pmsn() failed\n");
             return NULL;
         }
