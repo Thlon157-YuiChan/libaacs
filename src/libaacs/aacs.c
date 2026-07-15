@@ -58,6 +58,11 @@ struct aacs {
     int       mkb_version;
     uint8_t   disc_id[20];
 
+    /* data from config file */
+    char        *configfile_path;
+    int          configfile_probed;
+    config_file *cf;
+
     /* VID is cached for BD-J */
     uint8_t   vid[16];
     /* PMSN is cached for BD-J */
@@ -327,7 +332,20 @@ static MKB *_mkb_open(AACS *aacs)
  *
  */
 
-static int _calc_mk(AACS *aacs, pk_list *pkl, dk_list *dkl)
+static config_file *_ensure_config(AACS *aacs)
+{
+    if (!aacs->cf) {
+        /* avoid trying again if config file was not found first time */
+        if (!aacs->configfile_probed) {
+            aacs->cf = keydbcfg_config_load(aacs->configfile_path, aacs->disc_id);
+            X_FREE(aacs->configfile_path);
+            aacs->configfile_probed = 1;
+        }
+    }
+    return aacs->cf;
+}
+
+static int _calc_mk(AACS *aacs)
 {
     MKB *mkb = NULL;
     int result = AACS_ERROR_NO_PK;
@@ -364,8 +382,12 @@ static int _calc_mk(AACS *aacs, pk_list *pkl, dk_list *dkl)
         return AACS_ERROR_UNSUPPORTED_DISC;
     }
 
+    if (!_ensure_config(aacs)) {
+        return AACS_ERROR_NO_CONFIG;
+    }
+
     uint8_t mk[16] = {0};
-    result = mk_calculate(mk, mkb, pkl, dkl);
+    result = mk_calculate(mk, mkb, aacs->cf->pkl, aacs->cf->dkl);
 
     if (result == AACS_SUCCESS) {
         memcpy(aacs->mk, mk, sizeof(aacs->mk));
@@ -385,9 +407,14 @@ static int _calc_mk(AACS *aacs, pk_list *pkl, dk_list *dkl)
  * MMC device access
  */
 
-static int _mmc_read_auth(AACS *aacs, cert_list *hcl, int type, uint8_t *p1, uint8_t *p2)
+static int _mmc_read_auth(AACS *aacs, int type, uint8_t *p1, uint8_t *p2)
 {
     MMC* mmc = NULL;
+
+    if (!_ensure_config(aacs)) {
+        return AACS_ERROR_NO_CONFIG;
+    }
+
     if (!(mmc = mmc_open(aacs->path))) {
         return AACS_ERROR_MMC_OPEN;
     }
@@ -396,7 +423,7 @@ static int _mmc_read_auth(AACS *aacs, cert_list *hcl, int type, uint8_t *p1, uin
 
     const uint8_t *drive_cert = mmc_get_drive_cert(mmc);
 
-    for (; hcl ; hcl = hcl->next) {
+    for (cert_list *hcl = aacs->cf->host_cert_list; hcl ; hcl = hcl->next) {
 
         char tmp_str[2*92+1];
         int crypto_error;
@@ -438,7 +465,7 @@ static int _mmc_read_auth(AACS *aacs, cert_list *hcl, int type, uint8_t *p1, uin
     return error_code;
 }
 
-static int _read_vid(AACS *aacs, cert_list *hcl)
+static int _read_vid(AACS *aacs)
 {
     /* Use VID given in config file if available */
     if (memcmp(aacs->vid, empty_key, sizeof(aacs->vid))) {
@@ -451,7 +478,7 @@ static int _read_vid(AACS *aacs, cert_list *hcl)
         return AACS_SUCCESS;
     }
 
-    int error_code = _mmc_read_auth(aacs, hcl, MMC_READ_VID, aacs->vid, NULL);
+    int error_code = _mmc_read_auth(aacs, MMC_READ_VID, aacs->vid, NULL);
     if (error_code != AACS_SUCCESS) {
         BD_DEBUG(DBG_AACS, "Error reading VID!\n");
     } else {
@@ -465,7 +492,7 @@ static int _read_vid(AACS *aacs, cert_list *hcl)
     return error_code;
 }
 
-static int _read_read_data_key(AACS *aacs, cert_list *hcl)
+static int _read_read_data_key(AACS *aacs)
 {
     int error_code;
     char *cache_path = NULL;
@@ -473,7 +500,7 @@ static int _read_read_data_key(AACS *aacs, cert_list *hcl)
 
     cache_path = str_printf("rdk" DIR_SEP "%s", str_print_hex(str, aacs->drive_cert_hash, 20));
 
-    error_code =_mmc_read_auth(aacs, hcl, MMC_READ_DATA_KEYS, aacs->read_data_key, NULL);
+    error_code =_mmc_read_auth(aacs, MMC_READ_DATA_KEYS, aacs->read_data_key, NULL);
     if (error_code == AACS_SUCCESS) {
         /* cache read data key */
         if (!aacs->no_cache) {
@@ -497,9 +524,9 @@ static int _read_read_data_key(AACS *aacs, cert_list *hcl)
     return error_code;
 }
 
-static int _read_pmsn(AACS *aacs, cert_list *hcl)
+static int _read_pmsn(AACS *aacs)
 {
-    int error_code = _mmc_read_auth(aacs, hcl, MMC_READ_PMSN, aacs->pmsn, NULL);
+    int error_code = _mmc_read_auth(aacs, MMC_READ_PMSN, aacs->pmsn, NULL);
     if (error_code != AACS_SUCCESS) {
         BD_DEBUG(DBG_AACS, "Error reading PMSN!\n");
     }
@@ -510,7 +537,7 @@ static int _read_pmsn(AACS *aacs, cert_list *hcl)
  * Unit key calculation
  */
 
-static int _calc_vuk(AACS *aacs, uint8_t *vuk, config_file *cf)
+static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 {
     int error_code, crypto_err;
 
@@ -526,18 +553,14 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk, config_file *cf)
         return AACS_SUCCESS;
     }
 
-    if (!cf) {
-        return AACS_ERROR_NO_CONFIG;
-    }
-
     /* make sure we have media key */
-    error_code = _calc_mk(aacs, cf->pkl, cf->dkl);
+    error_code = _calc_mk(aacs);
     if (error_code != AACS_SUCCESS) {
         return error_code;
     }
 
     /* acquire VID */
-    error_code = _read_vid(aacs, cf->host_cert_list);
+    error_code = _read_vid(aacs);
     if (error_code != AACS_SUCCESS) {
         return error_code;
     }
@@ -622,7 +645,7 @@ static void _find_config_entry(AACS *aacs, config_file *cf, uint8_t *vuk)
 
         /* check against Unit_Key_RO.inf, only discard incorrect amount of UKs if VUK or MK+VID is available */
         if (num_uks != aacs->uk->num_uk) {
-            if (_calc_vuk(aacs, vuk, cf) == AACS_SUCCESS) {
+            if (_calc_vuk(aacs, vuk) == AACS_SUCCESS) {
                 BD_DEBUG(DBG_CRIT | DBG_AACS, "Ignoring unit keys from config file (expected %u keys, found %u)\n",
                          aacs->uk->num_uk, num_uks);
                 return;
@@ -723,7 +746,7 @@ static int _check_cci_unencrypted(AACS *aacs, int cps_unit)
     return result;
 }
 
-static int _calc_uks(AACS *aacs, config_file *cf)
+static int _calc_uks(AACS *aacs)
 {
     unsigned int i;
     int error_code = AACS_SUCCESS;
@@ -737,12 +760,12 @@ static int _calc_uks(AACS *aacs, config_file *cf)
     }
 
     /* first try cached vuk */
-    vuk_error_code = _calc_vuk(aacs, vuk, NULL);
+    vuk_error_code = _calc_vuk(aacs, vuk);
 
     /* Check the config file for MK, VID, VUK and UKs */
-    if (cf) {
+    if (_ensure_config(aacs)) {
         BD_DEBUG(DBG_AACS, "Searching for keydb config entry...\n");
-        _find_config_entry(aacs, cf, vuk);
+        _find_config_entry(aacs, aacs->cf, vuk);
 
         /* Skip if retrieved from config file */
         if (aacs->uk->uk) {
@@ -751,7 +774,7 @@ static int _calc_uks(AACS *aacs, config_file *cf)
 
         /* Try to calculate VUK */
         if (vuk_error_code != AACS_SUCCESS) {
-            vuk_error_code = _calc_vuk(aacs, vuk, cf);
+            vuk_error_code = _calc_vuk(aacs, vuk);
         }
     }
 
@@ -1038,10 +1061,10 @@ void aacs_set_fopen(AACS *aacs, void *handle, AACS_FILE_OPEN2 p)
 
 int aacs_open_device(AACS *aacs, const char *path, const char *configfile_path)
 {
-    config_file *cf;
     int error_code;
 
     aacs->path = path ? str_dup(path) : NULL;
+    aacs->configfile_path = configfile_path ? str_dup(configfile_path) : NULL;
 
     aacs->cc = _read_cc_any(aacs);
     aacs->bee = _get_bus_encryption_enabled(aacs);
@@ -1052,32 +1075,23 @@ int aacs_open_device(AACS *aacs, const char *path, const char *configfile_path)
         return error_code;
     }
 
-    cf = keydbcfg_config_load(configfile_path, aacs->disc_id);
-
     BD_DEBUG(DBG_AACS, "Starting AACS waterfall...\n");
-    error_code = _calc_uks(aacs, cf);
+    error_code = _calc_uks(aacs);
     if (error_code != AACS_SUCCESS) {
         BD_DEBUG(DBG_AACS, "Failed to initialize AACS!\n");
     }
 
     if (error_code == AACS_SUCCESS && aacs->bee) {
-
-        if (!cf) {
-            return AACS_ERROR_NO_CONFIG;
-        }
-
         if (aacs->bec < 0) {
             aacs->bec = _get_bus_encryption_capable(aacs);
         }
         if (aacs->bec > 0) {
-        error_code = _read_read_data_key(aacs, cf->host_cert_list);
+        error_code = _read_read_data_key(aacs);
         if (error_code != AACS_SUCCESS) {
             BD_DEBUG(DBG_AACS | DBG_CRIT, "Unable to initialize bus encryption required by drive and disc\n");
             }
         }
     }
-
-    keydbcfg_config_file_close(cf);
 
     BD_DEBUG(DBG_AACS, "AACS initialized!\n");
 
@@ -1088,6 +1102,9 @@ void aacs_close(AACS *aacs)
 {
     if (!aacs)
         return;
+
+    keydbcfg_config_file_close(aacs->cf);
+    X_FREE(aacs->configfile_path);
 
     uk_free(&aacs->uk);
 
@@ -1223,11 +1240,7 @@ const uint8_t *aacs2_get_bdj_root_cert_hash(AACS *aacs)
 const uint8_t *aacs_get_mk(AACS *aacs)
 {
     if (!memcmp(aacs->mk, empty_key, sizeof(aacs->mk))) {
-        config_file *cf = keydbcfg_config_load(NULL, NULL);
-        if (cf) {
-            _calc_mk(aacs, cf->pkl, cf->dkl);
-            keydbcfg_config_file_close(cf);
-        }
+        _calc_mk(aacs);
 
         if (!memcmp(aacs->mk, empty_key, sizeof(aacs->mk))) {
             BD_DEBUG(DBG_AACS | DBG_CRIT, "aacs_get_mk() failed\n");
@@ -1247,12 +1260,7 @@ const uint8_t *aacs_get_vid(AACS *aacs)
             return aacs->vid;
         }
 
-        config_file *cf = keydbcfg_config_load(NULL, NULL);
-        if (cf) {
-            _read_vid(aacs, cf->host_cert_list);
-
-            keydbcfg_config_file_close(cf);
-        }
+        _read_vid(aacs);
 
         if (!memcmp(aacs->vid, empty_key, sizeof(aacs->vid))) {
             BD_DEBUG(DBG_AACS | DBG_CRIT, "aacs_get_vid() failed\n");
@@ -1266,12 +1274,7 @@ const uint8_t *aacs_get_vid(AACS *aacs)
 const uint8_t *aacs_get_pmsn(AACS *aacs)
 {
     if (!memcmp(aacs->pmsn, empty_key, sizeof(aacs->pmsn))) {
-        config_file *cf = keydbcfg_config_load(NULL, NULL);
-        if (cf) {
-            _read_pmsn(aacs, cf->host_cert_list);
-
-            keydbcfg_config_file_close(cf);
-        }
+        _read_pmsn(aacs);
 
         if (!memcmp(aacs->pmsn, empty_key, sizeof(aacs->pmsn))) {
             BD_DEBUG(DBG_AACS, "aacs_get_pmsn() failed\n");
