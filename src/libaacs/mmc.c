@@ -38,6 +38,8 @@
 #define DEBUG_KEYS 0
 #endif
 
+#define MMC_MIN(a,b) ((a) < (b) ? (a) : (b))
+
 struct mmc {
     MMCDEV *dev;
 
@@ -136,10 +138,11 @@ static int _mmc_send_key(MMC *mmc, uint8_t agid, uint8_t format, uint8_t *buf,
                          uint16_t len)
 {
     uint8_t cmd[MMC_CDB_SIZE];
-    char str[512];
+    char str[233];
     memset(cmd, 0, sizeof(cmd));
 
-    BD_DEBUG(DBG_MMC, "MMC send key [%d] %s...\n", len, str_print_hex(str, buf, len));
+    BD_DEBUG(DBG_MMC, "MMC send key [%d] %s...\n", len,
+             str_print_hex(str, buf, MMC_MIN(len, (sizeof(str)-1)/2)));
 
     cmd[0] = MMC_SEND_KEY;
     cmd[7] = MMC_KEY_CLASS_AACS;
@@ -147,7 +150,7 @@ static int _mmc_send_key(MMC *mmc, uint8_t agid, uint8_t format, uint8_t *buf,
     cmd[9] = len & 0xff;
     cmd[10] = (agid << 6) | (format & 0x3f);
 
-    BD_DEBUG(DBG_MMC, "cmd: %s\n", str_print_hex(str, cmd, 16));
+    BD_DEBUG(DBG_MMC, "cmd: %s\n", str_print_hex(str, cmd, MMC_CDB_SIZE));
     return device_send_cmd(mmc->dev, cmd, buf, len, 0);
 }
 
