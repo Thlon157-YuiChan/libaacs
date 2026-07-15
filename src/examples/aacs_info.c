@@ -84,7 +84,9 @@ int main (int argc, char **argv)
         if (!strcmp(argv[1], "-r")) {
             show_rl = 1;
         } else if (!strcmp(argv[1], "-s")) {
+#if !defined(_WIN32)
             setenv("AACS_DEBUG_MASK", "0", 1);
+#endif
             silent = 1;
         } else {
             break;
