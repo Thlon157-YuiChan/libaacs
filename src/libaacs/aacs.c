@@ -337,6 +337,7 @@ static config_file *_ensure_config(AACS *aacs)
     if (!aacs->cf) {
         /* avoid trying again if config file was not found first time */
         if (!aacs->configfile_probed) {
+            /* NOTE: NULL is valid configfile_path (=look from system default locations) */
             aacs->cf = keydbcfg_config_load(aacs->configfile_path, aacs->disc_id);
             X_FREE(aacs->configfile_path);
             aacs->configfile_probed = 1;
@@ -350,7 +351,7 @@ static int _calc_mk(AACS *aacs)
     MKB *mkb = NULL;
     int result = AACS_ERROR_NO_PK;
 
-    /* Skip if retrieved from config file */
+    /* already known ? */
     if (memcmp(aacs->mk, empty_key, 16)) {
         return AACS_SUCCESS;
     }
@@ -467,7 +468,7 @@ static int _mmc_read_auth(AACS *aacs, int type, uint8_t *p1, uint8_t *p2)
 
 static int _read_vid(AACS *aacs)
 {
-    /* Use VID given in config file if available */
+    /* already known ? */
     if (memcmp(aacs->vid, empty_key, sizeof(aacs->vid))) {
         return AACS_SUCCESS;
     }
@@ -541,7 +542,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 {
     int error_code, crypto_err;
 
-    /* Skip if retrieved from config file */
+    /* already known ? */
     if (memcmp(vuk, empty_key, 16)) {
         BD_DEBUG(DBG_AACS, "Using VUK from config file\n");
         return AACS_SUCCESS;
@@ -1086,9 +1087,9 @@ int aacs_open_device(AACS *aacs, const char *path, const char *configfile_path)
             aacs->bec = _get_bus_encryption_capable(aacs);
         }
         if (aacs->bec > 0) {
-        error_code = _read_read_data_key(aacs);
-        if (error_code != AACS_SUCCESS) {
-            BD_DEBUG(DBG_AACS | DBG_CRIT, "Unable to initialize bus encryption required by drive and disc\n");
+            error_code = _read_read_data_key(aacs);
+            if (error_code != AACS_SUCCESS) {
+                BD_DEBUG(DBG_AACS | DBG_CRIT, "Unable to initialize bus encryption required by drive and disc\n");
             }
         }
     }
