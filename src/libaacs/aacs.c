@@ -867,13 +867,13 @@ static int _get_bus_encryption_enabled(AACS *aacs)
     return 0;
 }
 
-static int _get_bus_encryption_capable(AACS *aacs, const char *path)
+static int _get_bus_encryption_capable(AACS *aacs)
 {
     MMC* mmc = NULL;
     uint8_t drive_cert[92];
     int bec = 0;
 
-    if (!(mmc = mmc_open(path))) {
+    if (!(mmc = mmc_open(aacs->path))) {
         return 0;
     }
 
@@ -1067,7 +1067,7 @@ int aacs_open_device(AACS *aacs, const char *path, const char *configfile_path)
         }
 
         if (aacs->bec < 0) {
-            aacs->bec = _get_bus_encryption_capable(aacs, path);
+            aacs->bec = _get_bus_encryption_capable(aacs);
         }
         if (aacs->bec > 0) {
         error_code = _read_read_data_key(aacs, cf->host_cert_list);
@@ -1378,7 +1378,7 @@ void aacs_free_rl(AACS_RL_ENTRY **rl)
 uint32_t aacs_get_bus_encryption(AACS *aacs)
 {
     if (aacs->bec < 0) {
-        aacs->bec = _get_bus_encryption_capable(aacs, aacs->path);
+        aacs->bec = _get_bus_encryption_capable(aacs);
     }
   return (aacs->bee * AACS_BUS_ENCRYPTION_ENABLED) |
          (aacs->bec * AACS_BUS_ENCRYPTION_CAPABLE);
