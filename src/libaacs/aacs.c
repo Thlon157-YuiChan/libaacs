@@ -326,18 +326,18 @@ static MKB *_mkb_open(AACS *aacs)
  *
  */
 
-static int _calc_mk(AACS *aacs, uint8_t *mk, pk_list *pkl, dk_list *dkl)
+static int _calc_mk(AACS *aacs, pk_list *pkl, dk_list *dkl)
 {
     MKB *mkb = NULL;
     int result = AACS_ERROR_NO_PK;
 
     /* Skip if retrieved from config file */
-    if (memcmp(mk, empty_key, 16)) {
+    if (memcmp(aacs->mk, empty_key, 16)) {
         return AACS_SUCCESS;
     }
 
     /* get cached mk */
-    if (!aacs->no_cache && keycache_find("mk", aacs->disc_id, mk, 16)) {
+    if (!aacs->no_cache && keycache_find("mk", aacs->disc_id, aacs->mk, 16)) {
         BD_DEBUG(DBG_AACS, "Using cached MK\n");
         return AACS_SUCCESS;
     }
@@ -363,6 +363,7 @@ static int _calc_mk(AACS *aacs, uint8_t *mk, pk_list *pkl, dk_list *dkl)
         return AACS_ERROR_UNSUPPORTED_DISC;
     }
 
+    uint8_t mk[16] = {0};
     result = mk_calculate(mk, mkb, pkl, dkl);
 
     if (result == AACS_SUCCESS) {
@@ -508,7 +509,7 @@ static int _read_pmsn(AACS *aacs, cert_list *hcl)
  * Unit key calculation
  */
 
-static int _calc_vuk(AACS *aacs, uint8_t *mk, uint8_t *vuk, config_file *cf)
+static int _calc_vuk(AACS *aacs, uint8_t *vuk, config_file *cf)
 {
     int error_code, crypto_err;
 
@@ -529,7 +530,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *mk, uint8_t *vuk, config_file *cf)
     }
 
     /* make sure we have media key */
-    error_code = _calc_mk(aacs, mk, cf->pkl, cf->dkl);
+    error_code = _calc_mk(aacs, cf->pkl, cf->dkl);
     if (error_code != AACS_SUCCESS) {
         return error_code;
     }
@@ -542,7 +543,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *mk, uint8_t *vuk, config_file *cf)
 
     /* calculate VUK */
 
-    crypto_err = crypto_aes128d(mk, aacs->vid, vuk);
+    crypto_err = crypto_aes128d(aacs->mk, aacs->vid, vuk);
     if (crypto_err) {
         LOG_CRYPTO_ERROR(DBG_AACS, "decrypting VUK failed", crypto_err);
         return AACS_ERROR_UNKNOWN;
@@ -567,8 +568,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *mk, uint8_t *vuk, config_file *cf)
 }
 
 /* Function that collects keys from keydb config entry */
-static void _find_config_entry(AACS *aacs, config_file *cf,
-                               uint8_t *mk, uint8_t *vuk)
+static void _find_config_entry(AACS *aacs, config_file *cf, uint8_t *vuk)
 {
     title_entry_list *ce = cf->list;
     char str[2*16+1];
@@ -588,11 +588,10 @@ static void _find_config_entry(AACS *aacs, config_file *cf,
     }
 
     if (memcmp(ce->entry.mk, empty_key, 16)) {
-        memcpy(mk, ce->entry.mk, 16);
-        memcpy(aacs->mk, mk, 16);
+        memcpy(aacs->mk, ce->entry.mk, 16);
 
         BD_DEBUG(DBG_AACS, "Found media key for %s: %s\n",
-                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, mk, 16));
+                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, aacs->mk, 16));
     }
 
     if (memcmp(ce->entry.vid, empty_key, 16)) {
@@ -622,7 +621,7 @@ static void _find_config_entry(AACS *aacs, config_file *cf,
 
         /* check against Unit_Key_RO.inf, only discard incorrect amount of UKs if VUK or MK+VID is available */
         if (num_uks != aacs->uk->num_uk) {
-            if (_calc_vuk(aacs, mk, vuk, cf) == AACS_SUCCESS) {
+            if (_calc_vuk(aacs, vuk, cf) == AACS_SUCCESS) {
                 BD_DEBUG(DBG_CRIT | DBG_AACS, "Ignoring unit keys from config file (expected %u keys, found %u)\n",
                          aacs->uk->num_uk, num_uks);
                 return;
@@ -729,7 +728,7 @@ static int _calc_uks(AACS *aacs, config_file *cf)
     int error_code = AACS_SUCCESS;
     int vuk_error_code;
 
-    uint8_t mk[16] = {0}, vuk[16] = {0};
+    uint8_t vuk[16] = {0};
 
     if (aacs->uk->num_uk < 1) {
         /* no keys ... */
@@ -737,12 +736,12 @@ static int _calc_uks(AACS *aacs, config_file *cf)
     }
 
     /* first try cached vuk */
-    vuk_error_code = _calc_vuk(aacs, mk, vuk, NULL);
+    vuk_error_code = _calc_vuk(aacs, vuk, NULL);
 
     /* Check the config file for MK, VID, VUK and UKs */
     if (cf) {
         BD_DEBUG(DBG_AACS, "Searching for keydb config entry...\n");
-        _find_config_entry(aacs, cf, mk, vuk);
+        _find_config_entry(aacs, cf, vuk);
 
         /* Skip if retrieved from config file */
         if (aacs->uk->uk) {
@@ -751,7 +750,7 @@ static int _calc_uks(AACS *aacs, config_file *cf)
 
         /* Try to calculate VUK */
         if (vuk_error_code != AACS_SUCCESS) {
-            vuk_error_code = _calc_vuk(aacs, mk, vuk, cf);
+            vuk_error_code = _calc_vuk(aacs, vuk, cf);
         }
     }
 
@@ -1225,11 +1224,7 @@ const uint8_t *aacs_get_mk(AACS *aacs)
     if (!memcmp(aacs->mk, empty_key, sizeof(aacs->mk))) {
         config_file *cf = keydbcfg_config_load(NULL, NULL);
         if (cf) {
-            uint8_t mk[16] = {0};
-            if (_calc_mk(aacs, mk, cf->pkl, cf->dkl) == AACS_SUCCESS) {
-                memcpy(aacs->mk, mk, 16);
-            }
-
+            _calc_mk(aacs, cf->pkl, cf->dkl);
             keydbcfg_config_file_close(cf);
         }
 
