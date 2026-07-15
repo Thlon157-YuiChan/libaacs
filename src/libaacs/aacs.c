@@ -88,9 +88,10 @@ struct aacs {
     uint8_t   device_binding_id[16];
 };
 
-static const uint8_t empty_key[20] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+static const uint8_t empty_key[32] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00 };
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 /*
  * Revocation lists
@@ -1201,8 +1202,8 @@ const uint8_t *aacs_get_content_cert_id(AACS *aacs)
 
 const uint8_t *aacs_get_bdj_root_cert_hash(AACS *aacs)
 {
-    if (aacs && aacs->cc) {
-        if (!aacs->cc->aacs2) {
+    if (aacs && aacs->cc && !aacs->cc->aacs2) {
+        if (memcmp(aacs->cc->bdj_root_cert_hash, empty_key, 20)) {
             return aacs->cc->bdj_root_cert_hash;
         }
     }
@@ -1211,8 +1212,8 @@ const uint8_t *aacs_get_bdj_root_cert_hash(AACS *aacs)
 
 const uint8_t *aacs2_get_bdj_root_cert_hash(AACS *aacs)
 {
-    if (aacs && aacs->cc) {
-        if (aacs->cc->aacs2) {
+    if (aacs && aacs->cc && aacs->cc->aacs2) {
+        if (memcmp(aacs->cc->bdj_root_cert_hash, empty_key, 32)) {
             return aacs->cc->bdj_root_cert_hash;
         }
     }
