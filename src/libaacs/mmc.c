@@ -510,18 +510,19 @@ static int _verify_signature(const uint8_t *cert, const uint8_t *signature,
 static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, const uint8_t *host_cert, uint8_t *bus_key)
 {
     uint8_t hks[40], dn[20], dkp[40], dks[40];
-    char str[512];
     int crypto_error;
 
     memset(hks, 0, sizeof(hks));
 
     if (DEBUG_KEYS) {
+        char str[2*92+1];
         BD_DEBUG(DBG_MMC, "Host certificate   : %s\n", str_print_hex(str, host_cert,       92));
         BD_DEBUG(DBG_MMC, "Host nonce         : %s\n", str_print_hex(str, mmc->host_nonce, 20));
     }
 
     // send host cert + nonce
     if (!_mmc_send_host_cert(mmc, agid, mmc->host_nonce, host_cert)) {
+        char str[2*6+1];
 
         str_print_hex(str, host_cert + 4, 6);
         if ((mmc->drive_cert[1] & 0x01) && !(host_cert[1] & 0x01)) {
@@ -542,6 +543,7 @@ static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, 
     }
 
     if (DEBUG_KEYS) {
+        char str[2*92+1];
         BD_DEBUG(DBG_MMC, "Drive certificate   : %s\n", str_print_hex(str, mmc->drive_cert, 92));
         BD_DEBUG(DBG_MMC, "Drive nonce         : %s\n", str_print_hex(str, dn, 20));
     }
@@ -565,6 +567,7 @@ static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, 
     }
 
     if (DEBUG_KEYS) {
+        char str[2*40+1];
         BD_DEBUG(DBG_MMC, "Drive key point     : %s\n", str_print_hex(str, dkp, 40));
         BD_DEBUG(DBG_MMC, "Drive key signature : %s\n", str_print_hex(str, dks, 40));
     }
@@ -590,6 +593,7 @@ static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, 
 
     // send signed host key and point
     if (!_mmc_send_host_key(mmc, agid, mmc->host_key_point, hks)) {
+        char str[2*40+1];
         BD_DEBUG(DBG_MMC | DBG_CRIT, "Error sending host signature\n");
         BD_DEBUG(DBG_MMC,  "Host key signature : %s\n", str_print_hex(str, hks, 40));
         return MMC_ERROR;
@@ -599,6 +603,7 @@ static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, 
     if (bus_key) {
         crypto_create_bus_key(mmc->host_key, dkp, bus_key);
         if (DEBUG_KEYS) {
+            char str[2*16+1];
             BD_DEBUG(DBG_MMC, "Bus Key             : %s\n", str_print_hex(str, bus_key, 16));
         }
     }
@@ -613,13 +618,13 @@ static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, 
 static int _read_vid(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *vid)
 {
     uint8_t mac[16], calc_mac[16];
-    char str[512];
     int err;
 
     BD_DEBUG(DBG_MMC, "Reading VID from drive...\n");
 
     if (_mmc_read_vid(mmc, agid, vid, mac)) {
         if (DEBUG_KEYS) {
+            char str[2*16+1];
             BD_DEBUG(DBG_MMC, "VID                 : %s\n", str_print_hex(str, vid, 16));
             BD_DEBUG(DBG_MMC, "VID MAC             : %s\n", str_print_hex(str, mac, 16));
         }
@@ -646,13 +651,13 @@ static int _read_vid(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *vi
 static int _read_pmsn(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *pmsn)
 {
     uint8_t mac[16], calc_mac[16];
-    char str[512];
     int err;
 
     BD_DEBUG(DBG_MMC, "Reading PMSN from drive...\n");
 
     if (_mmc_read_pmsn(mmc, agid, pmsn, mac)) {
         if (DEBUG_KEYS) {
+            char str[2*16+1];
             BD_DEBUG(DBG_MMC, "PMSN                : %s\n", str_print_hex(str, pmsn, 16));
             BD_DEBUG(DBG_MMC, "PMSN MAC            : %s\n", str_print_hex(str, mac, 16));
         }
@@ -680,7 +685,6 @@ static int _read_data_keys(MMC *mmc, uint8_t agid, const uint8_t *bus_key,
                            uint8_t *read_data_key, uint8_t *write_data_key)
 {
     uint8_t encrypted_read_data_key[16], encrypted_write_data_key[16];
-    char str[512];
 
     BD_DEBUG(DBG_MMC, "Reading data keys from drive...\n");
 
@@ -692,6 +696,7 @@ static int _read_data_keys(MMC *mmc, uint8_t agid, const uint8_t *bus_key,
                 return MMC_ERROR;
             }
             if (DEBUG_KEYS) {
+                char str[2*16+1];
                 BD_DEBUG(DBG_MMC, "READ DATA KEY       : %s\n", str_print_hex(str, read_data_key, 16));
             }
         }
@@ -702,6 +707,7 @@ static int _read_data_keys(MMC *mmc, uint8_t agid, const uint8_t *bus_key,
                 return MMC_ERROR;
             }
             if (DEBUG_KEYS) {
+                char str[2*16+1];
                 BD_DEBUG(DBG_MMC, "WRITE DATA KEY      : %s\n", str_print_hex(str, write_data_key, 16));
             }
         }

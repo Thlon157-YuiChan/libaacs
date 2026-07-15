@@ -467,7 +467,7 @@ static int _read_read_data_key(AACS *aacs, cert_list *hcl)
 {
     int error_code;
     char *cache_path = NULL;
-    char str[41];
+    char str[2*20+1];
 
     cache_path = str_printf("rdk" DIR_SEP "%s", str_print_hex(str, aacs->drive_cert_hash, 20));
 
@@ -553,7 +553,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *mk, uint8_t *vuk, config_file *cf)
         vuk[a] ^= aacs->vid[a];
     }
 
-    char str[40];
+    char str[2*16+1];
     BD_DEBUG(DBG_AACS, "Volume unique key: %s\n", str_print_hex(str, vuk, 16));
 
     /* cache vuk */
@@ -571,13 +571,13 @@ static void _find_config_entry(AACS *aacs, config_file *cf,
                                uint8_t *mk, uint8_t *vuk)
 {
     title_entry_list *ce = cf->list;
-    char str[48];
-    char str2[48];
+    char str[2*16+1];
+    char str_id[2*20+1];
 
     while (ce) {
         if (!memcmp(aacs->disc_id, ce->entry.discid, 20)) {
             BD_DEBUG(DBG_AACS, "Found config entry for discid %s\n",
-                     str_print_hex(str, ce->entry.discid, 20));
+                     str_print_hex(str_id, ce->entry.discid, 20));
             break;
         }
 
@@ -592,21 +592,21 @@ static void _find_config_entry(AACS *aacs, config_file *cf,
         memcpy(aacs->mk, mk, 16);
 
         BD_DEBUG(DBG_AACS, "Found media key for %s: %s\n",
-                 str_print_hex(str2, ce->entry.discid, 20), str_print_hex(str, mk, 16));
+                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, mk, 16));
     }
 
     if (memcmp(ce->entry.vid, empty_key, 16)) {
         memcpy(aacs->vid, ce->entry.vid, 16);
 
         BD_DEBUG(DBG_AACS, "Found volume id for %s: %s\n",
-                 str_print_hex(str2, ce->entry.discid, 20), str_print_hex(str, aacs->vid, 16));
+                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, aacs->vid, 16));
     }
 
     if (!memcmp(vuk, empty_key, 16) && memcmp(ce->entry.vuk, empty_key, 16)) {
         memcpy(vuk, ce->entry.vuk, 16);
 
         BD_DEBUG(DBG_AACS, "Found volume unique key for %s: %s\n",
-                 str_print_hex(str2, ce->entry.discid, 20), str_print_hex(str, vuk, 16));
+                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, vuk, 16));
     }
 
     if (ce->entry.uk) {
@@ -783,7 +783,7 @@ static int _calc_uks(AACS *aacs, config_file *cf)
             return AACS_ERROR_UNKNOWN;
         }
 
-        char str[40];
+        char str[2*16+1];
         BD_DEBUG(DBG_AACS, "Unit key %d: %s\n", i,
                  str_print_hex(str, aacs->uk->uk[i].key, 16));
     }
@@ -799,7 +799,6 @@ static int _calc_title_hash(AACS *aacs)
 {
     void    *data = NULL;
     size_t   size;
-    char     str[48];
     int      result = AACS_SUCCESS;
     int      aacs2 = aacs->cc ? aacs->cc->aacs2 : 0;
 
@@ -818,6 +817,7 @@ static int _calc_title_hash(AACS *aacs)
     }
 
     if (aacs->uk) {
+        char str[2*20+1];
         crypto_aacs_title_hash(data, size, aacs->disc_id);
         BD_DEBUG(DBG_AACS, "Disc ID: %s\n", str_print_hex(str, aacs->disc_id, 20));
 

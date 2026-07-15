@@ -47,7 +47,7 @@ static int _validate_pk(const uint8_t *pk,
 {
     int a, crypto_err;
     uint8_t dec_vd[16];
-    char str[40];
+    char str[2*16+1];
 
     BD_DEBUG(DBG_AACS, "Validate processing key %s...\n", str_print_hex(str, pk, 16));
     BD_DEBUG(DBG_AACS, " Using:\n");
@@ -129,7 +129,7 @@ static int _calc_pk(const uint8_t *dk, uint8_t *pk, uint32_t uv, uint32_t v_mask
         dev_key_v_mask = ((int) dev_key_v_mask) >> 1;
     }
 
-    char str[40];
+    char str[2*16+1];
     BD_DEBUG(DBG_AACS, "Processing key: %s\n",  str_print_hex(str, pk, 16));
     return AACS_SUCCESS;
 }
@@ -162,7 +162,7 @@ static dk_list *_find_dk(dk_list *dkl, uint32_t *p_dev_key_v_mask, uint32_t uv, 
     if (!dkl) {
         BD_DEBUG(DBG_AACS | DBG_CRIT, "could not find applying device key (device 0x%x)\n", device_number);
     } else {
-        char str[128];
+        char str[2*16+1];
         BD_DEBUG(DBG_AACS, "Applying device key is #%d %s\n", key_idx, str_print_hex(str, dkl->key, 16));
         BD_DEBUG(DBG_AACS, "  UV: 0x%08x  U mask: 0x%08x  V mask: 0x%08x\n", dev_key_uv, dev_key_u_mask, dev_key_v_mask);
         *p_dev_key_v_mask = dev_key_v_mask;
@@ -178,7 +178,7 @@ static int _calc_mk_dks(MKB *mkb, dk_list *dkl, uint8_t *mk)
     const uint8_t *uvs, *cvalues, *mk_dv;
     unsigned num_uvs;
     size_t len;
-    char str[128];
+    char str[2*16+1];
 
     /* get mkb data */
 
@@ -330,7 +330,7 @@ static int _calc_mk_pks(MKB *mkb, pk_list *pkl, uint8_t *mk)
         for (a = 0; a < num_uvs; a++) {
             if (AACS_SUCCESS == _validate_pk(pkl->key, rec + a * 16, uvs + 1 + a * 5, mk_dv, mk)) {
 
-                char str[40];
+                char str[2*16+1];
                 BD_DEBUG(DBG_AACS, "Media key: %s\n", str_print_hex(str, mk, 16));
                 return AACS_SUCCESS;
             }
