@@ -346,6 +346,15 @@ static config_file *_ensure_config(AACS *aacs)
     return aacs->cf;
 }
 
+static void _keycache_save(AACS *aacs, const char *type, const uint8_t *key, size_t key_size)
+{
+    if (!aacs->no_cache) {
+        if (memcmp(aacs->disc_id, empty_key, sizeof(aacs->disc_id))) {
+            keycache_save(type, aacs->disc_id, key, key_size);
+        }
+    }
+}
+
 static int _calc_mk(AACS *aacs)
 {
     MKB *mkb = NULL;
@@ -393,11 +402,7 @@ static int _calc_mk(AACS *aacs)
     if (result == AACS_SUCCESS) {
         memcpy(aacs->mk, mk, sizeof(aacs->mk));
         /* cache mk */
-        if (!aacs->no_cache) {
-            if (memcmp(aacs->disc_id, empty_key, sizeof(aacs->disc_id))) {
-                keycache_save("mk", aacs->disc_id, mk, 16);
-            }
-        }
+        _keycache_save(aacs, "mk", mk, 16);
     }
 
     mkb_close(mkb);
@@ -484,11 +489,7 @@ static int _read_vid(AACS *aacs)
         BD_DEBUG(DBG_AACS, "Error reading VID!\n");
     } else {
         /* cache vid */
-        if (!aacs->no_cache) {
-            if (memcmp(aacs->disc_id, empty_key, sizeof(aacs->disc_id))) {
-                keycache_save("vid", aacs->disc_id, aacs->vid, 16);
-            }
-        }
+      _keycache_save(aacs, "vid", aacs->vid, 16);
     }
     return error_code;
 }
@@ -504,9 +505,7 @@ static int _read_read_data_key(AACS *aacs)
     error_code =_mmc_read_auth(aacs, MMC_READ_DATA_KEYS, aacs->read_data_key, NULL);
     if (error_code == AACS_SUCCESS) {
         /* cache read data key */
-        if (!aacs->no_cache) {
-            keycache_save(cache_path, aacs->disc_id, aacs->read_data_key, 16);
-        }
+        _keycache_save(aacs, cache_path, aacs->read_data_key, 16);
 
     } else {
         /* get cached read data key */
@@ -574,11 +573,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
     BD_DEBUG(DBG_AACS, "Volume unique key: %s\n", str_print_hex(str, vuk, 16));
 
     /* cache vuk */
-    if (!aacs->no_cache) {
-        if (memcmp(aacs->disc_id, empty_key, sizeof(aacs->disc_id))) {
-            keycache_save("vuk", aacs->disc_id, vuk, 16);
-        }
-    }
+    _keycache_save(aacs, "vuk", vuk, 16);
 
     return AACS_SUCCESS;
 }
