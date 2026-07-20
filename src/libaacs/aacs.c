@@ -346,6 +346,28 @@ static config_file *_ensure_config(AACS *aacs)
     return aacs->cf;
 }
 
+static const title_entry_list *_disc_config_entry(AACS *aacs)
+{
+    if (!_ensure_config(aacs)) {
+        return NULL;
+    }
+
+    for (const title_entry_list *ce = aacs->cf->list; ce; ce = ce->next) {
+        if (!memcmp(aacs->disc_id, ce->entry.discid, 20)) {
+            char str[2*20+1];
+            BD_DEBUG(DBG_AACS, "Found config entry for discid %s\n",
+                     str_print_hex(str, ce->entry.discid, 20));
+            return ce;
+        }
+    }
+
+    return NULL;
+}
+
+/*
+ *
+ */
+
 static void _keycache_save(AACS *aacs, const char *type, const uint8_t *key, size_t key_size)
 {
     if (!aacs->no_cache) {
@@ -579,21 +601,13 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 }
 
 /* Function that collects keys from keydb config entry */
-static void _find_config_entry(AACS *aacs, config_file *cf, uint8_t *vuk)
+static void _find_config_entry(AACS *aacs, uint8_t *vuk)
 {
-    title_entry_list *ce = cf->list;
+    const title_entry_list *ce;
     char str[2*16+1];
     char str_id[2*20+1];
 
-    while (ce) {
-        if (!memcmp(aacs->disc_id, ce->entry.discid, 20)) {
-            BD_DEBUG(DBG_AACS, "Found config entry for discid %s\n",
-                     str_print_hex(str_id, ce->entry.discid, 20));
-            break;
-        }
-
-        ce = ce->next;
-    }
+    ce = _disc_config_entry(aacs);
     if (!ce) {
         return;
     }
@@ -752,7 +766,7 @@ static int _calc_uks(AACS *aacs)
     /* Check the config file for MK, VID, VUK and UKs */
     if (_ensure_config(aacs)) {
         BD_DEBUG(DBG_AACS, "Searching for keydb config entry...\n");
-        _find_config_entry(aacs, aacs->cf, vuk);
+        _find_config_entry(aacs, vuk);
 
         /* Skip if retrieved from config file */
         if (aacs->uk->uk) {
