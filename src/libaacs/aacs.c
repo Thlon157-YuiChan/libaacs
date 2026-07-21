@@ -643,23 +643,34 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
     return AACS_SUCCESS;
 }
 
+static int _get_vuk(AACS *aacs, uint8_t *vuk)
+{
+    int error_code = _calc_vuk(aacs, vuk);
+
+    if (error_code != AACS_SUCCESS) {
+        /* check config entry */
+        const title_entry_list *ce = _disc_config_entry(aacs);
+        if (ce && memcmp(ce->entry.vuk, empty_key, 16)) {
+            char str[2*16+1];
+            BD_DEBUG(DBG_AACS, "Found VUK: %s\n", str_print_hex(str, ce->entry.vuk, 16));
+            memcpy(vuk, ce->entry.vuk, 16);
+            aacs->poisoned_keys = 1;
+            return AACS_SUCCESS;
+        }
+    }
+
+    return error_code;
+}
+
 /* Function that collects keys from keydb config entry */
-static void _find_config_entry(AACS *aacs, uint8_t *vuk)
+static void _find_config_entry(AACS *aacs)
 {
     const title_entry_list *ce;
     char str[2*16+1];
-    char str_id[2*20+1];
 
     ce = _disc_config_entry(aacs);
     if (!ce) {
         return;
-    }
-
-    if (!memcmp(vuk, empty_key, 16) && memcmp(ce->entry.vuk, empty_key, 16)) {
-        memcpy(vuk, ce->entry.vuk, 16);
-
-        BD_DEBUG(DBG_AACS, "Found volume unique key for %s: %s\n",
-                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, vuk, 16));
     }
 
     if (ce->entry.uk) {
@@ -673,13 +684,8 @@ static void _find_config_entry(AACS *aacs, uint8_t *vuk)
             ukcursor = ukcursor->next;
         }
 
-        /* check against Unit_Key_RO.inf, only discard incorrect amount of UKs if VUK or MK+VID is available */
+        /* check against Unit_Key_RO.inf */
         if (num_uks != aacs->uk->num_uk) {
-            if (_calc_vuk(aacs, vuk) == AACS_SUCCESS) {
-                BD_DEBUG(DBG_CRIT | DBG_AACS, "Ignoring unit keys from config file (expected %u keys, found %u)\n",
-                         aacs->uk->num_uk, num_uks);
-                return;
-            }
             BD_DEBUG(DBG_CRIT | DBG_AACS, "Incomplete unit keys in config file (expected %u keys, found %u)\n",
                      aacs->uk->num_uk, num_uks);
         }
@@ -789,22 +795,16 @@ static int _calc_uks(AACS *aacs)
         return AACS_SUCCESS;
     }
 
-    /* first try cached vuk */
-    vuk_error_code = _calc_vuk(aacs, vuk);
+    vuk_error_code = _get_vuk(aacs, vuk);
 
-    /* Check the config file for MK, VID, VUK and UKs */
-    if (_ensure_config(aacs)) {
+    if (vuk_error_code != AACS_SUCCESS) {
+        /* Check the config file for UKs */
         BD_DEBUG(DBG_AACS, "Searching for keydb config entry...\n");
-        _find_config_entry(aacs, vuk);
+        _find_config_entry(aacs);
 
         /* Skip if retrieved from config file */
         if (aacs->uk->uk) {
             return AACS_SUCCESS;
-        }
-
-        /* Try to calculate VUK */
-        if (vuk_error_code != AACS_SUCCESS) {
-            vuk_error_code = _calc_vuk(aacs, vuk);
         }
     }
 
