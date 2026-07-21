@@ -534,6 +534,26 @@ static int _read_vid(AACS *aacs)
         /* cache vid */
       _keycache_save(aacs, "vid", aacs->vid, 16);
     }
+
+    return error_code;
+}
+
+static int _get_vid(AACS *aacs)
+{
+    int error_code = _read_vid(aacs);
+
+    if (error_code != AACS_SUCCESS) {
+        /* check config entry */
+        const title_entry_list *ce = _disc_config_entry(aacs);
+        if (ce && memcmp(ce->entry.vid, empty_key, 16)) {
+            char str[2*16+1];
+            BD_DEBUG(DBG_AACS, "Found VID: %s\n", str_print_hex(str, ce->entry.vid, 16));
+            memcpy(aacs->vid, ce->entry.vid, sizeof(aacs->vid));
+            aacs->poisoned_keys = 1;
+            return AACS_SUCCESS;
+        }
+    }
+
     return error_code;
 }
 
@@ -594,7 +614,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
     }
 
     /* acquire VID */
-    error_code = _read_vid(aacs);
+    error_code = _get_vid(aacs);
     if (error_code != AACS_SUCCESS) {
         return error_code;
     }
@@ -633,13 +653,6 @@ static void _find_config_entry(AACS *aacs, uint8_t *vuk)
     ce = _disc_config_entry(aacs);
     if (!ce) {
         return;
-    }
-
-    if (memcmp(ce->entry.vid, empty_key, 16)) {
-        memcpy(aacs->vid, ce->entry.vid, 16);
-
-        BD_DEBUG(DBG_AACS, "Found volume id for %s: %s\n",
-                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, aacs->vid, 16));
     }
 
     if (!memcmp(vuk, empty_key, 16) && memcmp(ce->entry.vuk, empty_key, 16)) {
@@ -1264,7 +1277,7 @@ const uint8_t *aacs_get_mk(AACS *aacs)
 
 const uint8_t *aacs_get_vid(AACS *aacs)
 {
-    if (_read_vid(aacs) == AACS_SUCCESS) {
+    if (_get_vid(aacs) == AACS_SUCCESS) {
         return aacs->vid;
     }
     return NULL;
