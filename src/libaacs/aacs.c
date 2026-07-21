@@ -59,8 +59,9 @@ struct aacs {
     uint8_t   disc_id[20];
 
     /* data from config file */
+    uint8_t      poisoned_keys;
+    uint8_t      configfile_probed;
     char        *configfile_path;
-    int          configfile_probed;
     config_file *cf;
 
     /* VID is cached for BD-J */
@@ -421,13 +422,33 @@ static int _calc_mk(AACS *aacs)
     uint8_t mk[16] = {0};
     result = mk_calculate(mk, mkb, aacs->cf->pkl, aacs->cf->dkl);
 
+    mkb_close(mkb);
+
     if (result == AACS_SUCCESS) {
         memcpy(aacs->mk, mk, sizeof(aacs->mk));
         /* cache mk */
         _keycache_save(aacs, "mk", mk, 16);
     }
 
-    mkb_close(mkb);
+    return result;
+}
+
+static int _get_mk(AACS *aacs)
+{
+    int result = _calc_mk(aacs);
+
+    if (result != AACS_SUCCESS) {
+        /* check config entry */
+        const title_entry_list *ce = _disc_config_entry(aacs);
+        if (ce && memcmp(ce->entry.mk, empty_key, 16)) {
+            char str[2*16+1];
+            BD_DEBUG(DBG_AACS, "Found media key: %s\n", str_print_hex(str, ce->entry.mk, 16));
+            memcpy(aacs->mk, ce->entry.mk, sizeof(aacs->mk));
+            aacs->poisoned_keys = 1;
+            return AACS_SUCCESS;
+        }
+    }
+
     return result;
 }
 
@@ -567,7 +588,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
     }
 
     /* make sure we have media key */
-    error_code = _calc_mk(aacs);
+    error_code = _get_mk(aacs);
     if (error_code != AACS_SUCCESS) {
         return error_code;
     }
@@ -594,8 +615,10 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
     char str[2*16+1];
     BD_DEBUG(DBG_AACS, "Volume unique key: %s\n", str_print_hex(str, vuk, 16));
 
-    /* cache vuk */
-    _keycache_save(aacs, "vuk", vuk, 16);
+    /* cache vuk if it was verified (=calculated from scratch) */
+    if (!aacs->poisoned_keys) {
+        _keycache_save(aacs, "vuk", vuk, 16);
+    }
 
     return AACS_SUCCESS;
 }
@@ -610,13 +633,6 @@ static void _find_config_entry(AACS *aacs, uint8_t *vuk)
     ce = _disc_config_entry(aacs);
     if (!ce) {
         return;
-    }
-
-    if (memcmp(ce->entry.mk, empty_key, 16)) {
-        memcpy(aacs->mk, ce->entry.mk, 16);
-
-        BD_DEBUG(DBG_AACS, "Found media key for %s: %s\n",
-                 str_print_hex(str_id, ce->entry.discid, 20), str_print_hex(str, aacs->mk, 16));
     }
 
     if (memcmp(ce->entry.vid, empty_key, 16)) {
@@ -1240,7 +1256,7 @@ const uint8_t *aacs2_get_bdj_root_cert_hash(AACS *aacs)
 
 const uint8_t *aacs_get_mk(AACS *aacs)
 {
-    if (_calc_mk(aacs) == AACS_SUCCESS) {
+    if (_get_mk(aacs) == AACS_SUCCESS) {
         return aacs->mk;
     }
     return NULL;
