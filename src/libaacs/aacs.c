@@ -678,46 +678,46 @@ static void _find_uk_config_entry(AACS *aacs)
         return;
     }
 
-        BD_DEBUG(DBG_AACS, "Acquire CPS unit keys from keydb config file...\n");
+    BD_DEBUG(DBG_AACS, "Acquire CPS unit keys from keydb config file...\n");
 
-        /* count keys */
-        unsigned num_uks = 0;
-        digit_key_pair_list *ukcursor = ce->entry.uk;
-        while (ukcursor) {
-            num_uks++;
-            ukcursor = ukcursor->next;
-        }
+    /* count keys */
+    unsigned num_uks = 0;
+    digit_key_pair_list *ukcursor = ce->entry.uk;
+    while (ukcursor) {
+        num_uks++;
+        ukcursor = ukcursor->next;
+    }
 
-        /* check against Unit_Key_RO.inf */
-        if (num_uks != aacs->uk->num_uk) {
-            BD_DEBUG(DBG_CRIT | DBG_AACS, "Incomplete unit keys in config file (expected %u keys, found %u)\n",
-                     aacs->uk->num_uk, num_uks);
-        }
+    /* check against Unit_Key_RO.inf */
+    if (num_uks != aacs->uk->num_uk) {
+        BD_DEBUG(DBG_CRIT | DBG_AACS, "Incomplete unit keys in config file (expected %u keys, found %u)\n",
+                 aacs->uk->num_uk, num_uks);
+    }
 
-        /* get keys */
+    /* get keys */
 
-        if (num_uks > aacs->uk->num_uk) {
-            /* config file has more unit keys than the disc has */
-            aacs->uk->num_uk = num_uks;
-        }
+    if (num_uks > aacs->uk->num_uk) {
+        /* config file has more unit keys than the disc has */
+        aacs->uk->num_uk = num_uks;
+    }
 
-        aacs->uk->uk = calloc(aacs->uk->num_uk, sizeof(aacs->uk->uk[0]));
-        if (!aacs->uk->uk) {
-            return;
-        }
+    aacs->uk->uk = calloc(aacs->uk->num_uk, sizeof(aacs->uk->uk[0]));
+    if (!aacs->uk->uk) {
+        return;
+    }
 
-        num_uks = 0;
-        ukcursor = ce->entry.uk;
-        while (ukcursor) {
-            memcpy(aacs->uk->uk[num_uks].key, ukcursor->key_pair.key, 16);
+    num_uks = 0;
+    ukcursor = ce->entry.uk;
+    while (ukcursor) {
+        memcpy(aacs->uk->uk[num_uks].key, ukcursor->key_pair.key, 16);
 
-            BD_DEBUG(DBG_AACS, "Unit key %u from keydb entry: %s\n",
-                     num_uks,
-                     str_print_hex(str, aacs->uk->uk[num_uks].key, 16));
+        BD_DEBUG(DBG_AACS, "Unit key %u from keydb entry: %s\n",
+                 num_uks,
+                 str_print_hex(str, aacs->uk->uk[num_uks].key, 16));
 
-            num_uks++;
-            ukcursor = ukcursor->next;
-        }
+        num_uks++;
+        ukcursor = ukcursor->next;
+    }
 }
 
 static size_t _read_cci_file(AACS *aacs, int cps_unit, void **data)
@@ -808,6 +808,8 @@ static int _calc_uks(AACS *aacs)
         if (aacs->uk->uk) {
             return AACS_SUCCESS;
         }
+
+        /* do not bail out yet - there may be unencrypted CPS units */
     }
 
     BD_DEBUG(DBG_AACS, "Calculate CPS unit keys...\n");
@@ -1076,6 +1078,7 @@ AACS *aacs_init()
     }
     return aacs;
 }
+
 void aacs_set_key_caching(AACS *aacs, int enable)
 {
     if (aacs) {
