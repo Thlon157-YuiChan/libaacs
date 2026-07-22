@@ -674,11 +674,10 @@ static void _find_uk_config_entry(AACS *aacs)
     char str[2*16+1];
 
     ce = _disc_config_entry(aacs);
-    if (!ce) {
+    if (!ce || !ce->entry.uk) {
         return;
     }
 
-    if (ce->entry.uk) {
         BD_DEBUG(DBG_AACS, "Acquire CPS unit keys from keydb config file...\n");
 
         /* count keys */
@@ -719,7 +718,6 @@ static void _find_uk_config_entry(AACS *aacs)
             num_uks++;
             ukcursor = ukcursor->next;
         }
-    }
 }
 
 static size_t _read_cci_file(AACS *aacs, int cps_unit, void **data)
