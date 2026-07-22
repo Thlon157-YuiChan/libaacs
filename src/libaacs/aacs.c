@@ -668,8 +668,7 @@ static int _get_vuk(AACS *aacs, uint8_t *vuk)
     return error_code;
 }
 
-/* Function that collects keys from keydb config entry */
-static void _find_config_entry(AACS *aacs)
+static void _find_uk_config_entry(AACS *aacs)
 {
     const title_entry_list *ce;
     char str[2*16+1];
@@ -805,8 +804,7 @@ static int _calc_uks(AACS *aacs)
 
     if (vuk_error_code != AACS_SUCCESS) {
         /* Check the config file for UKs */
-        BD_DEBUG(DBG_AACS, "Searching for keydb config entry...\n");
-        _find_config_entry(aacs);
+        _find_uk_config_entry(aacs);
 
         /* Skip if retrieved from config file */
         if (aacs->uk->uk) {
