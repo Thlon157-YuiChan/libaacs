@@ -331,8 +331,94 @@ static MKB *_mkb_open(AACS *aacs)
     return mkb;
 }
 
+static size_t _read_cci_file(AACS *aacs, int cps_unit, void **data)
+{
+    char   *fname;
+    size_t  size = 0;
+
+    fname = str_printf("AACS" DIR_SEP "CPSUnit%05d.cci", cps_unit);
+    if (fname) {
+        size = _read_file(aacs, fname, data);
+        X_FREE(fname);
+
+        if (size >= 2048) {
+            return size;
+        }
+
+        X_FREE(*data);
+    }
+
+    /* try backup copy */
+
+    fname = str_printf("AACS" DIR_SEP "DUPLICATE" DIR_SEP "CPSUnit%05d.cci", cps_unit);
+    if (fname) {
+        size = _read_file(aacs, fname, data);
+        X_FREE(fname);
+
+        if (size >= 2048) {
+            return size;
+        }
+
+        X_FREE(*data);
+    }
+
+    return 0;
+}
+
+static AACS_CCI *_read_cci(AACS *aacs, int cps_unit)
+{
+    AACS_CCI *cci;
+    void     *data;
+    size_t    size;
+
+    size = _read_cci_file(aacs, cps_unit, &data);
+    if (!size) {
+        BD_DEBUG(DBG_AACS | DBG_CRIT, "Failed to read CPS unit usage file %d\n", cps_unit);
+        return NULL;
+    }
+
+    cci = cci_parse(data, size);
+    X_FREE(data);
+
+    return cci;
+}
+
+static int _check_cci_unencrypted(AACS *aacs, int cps_unit)
+{
+    int result = -1;
+
+    AACS_CCI *cci = _read_cci(aacs, cps_unit);
+    if (cci) {
+        result = cci_is_unencrypted(cci);
+        cci_free(&cci);
+    }
+
+    return result;
+}
+
+static CONTENT_CERT *_read_cc_any(AACS *aacs)
+{
+    CONTENT_CERT *cc = NULL;
+    void   *data;
+    size_t  size;
+
+    size = _read_file(aacs, "AACS" DIR_SEP "Content000.cer", &data);
+    if (!size) {
+        size = _read_file(aacs, "AACS" DIR_SEP "Content001.cer", &data);
+    }
+
+    if (size) {
+        cc = cc_parse(data, size);
+        X_FREE(data);
+    } else {
+        BD_DEBUG(DBG_AACS | DBG_CRIT, "Failed to read content certificate file\n");
+    }
+
+    return cc;
+}
+
 /*
- *
+ * Config file
  */
 
 static config_file *_ensure_config(AACS *aacs)
@@ -367,9 +453,57 @@ static const title_entry_list *_disc_config_entry(AACS *aacs)
     return NULL;
 }
 
-/*
- *
- */
+static void _find_uk_config_entry(AACS *aacs)
+{
+    const title_entry_list *ce;
+    char str[2*16+1];
+
+    ce = _disc_config_entry(aacs);
+    if (!ce || !ce->entry.uk) {
+        return;
+    }
+
+    BD_DEBUG(DBG_AACS, "Acquire CPS unit keys from keydb config file...\n");
+
+    /* count keys */
+    unsigned num_uks = 0;
+    digit_key_pair_list *ukcursor = ce->entry.uk;
+    while (ukcursor) {
+        num_uks++;
+        ukcursor = ukcursor->next;
+    }
+
+    /* check against Unit_Key_RO.inf */
+    if (num_uks != aacs->uk->num_uk) {
+        BD_DEBUG(DBG_CRIT | DBG_AACS, "Incomplete unit keys in config file (expected %u keys, found %u)\n",
+                 aacs->uk->num_uk, num_uks);
+    }
+
+    /* get keys */
+
+    if (num_uks > aacs->uk->num_uk) {
+        /* config file has more unit keys than the disc has */
+        aacs->uk->num_uk = num_uks;
+    }
+
+    aacs->uk->uk = calloc(aacs->uk->num_uk, sizeof(aacs->uk->uk[0]));
+    if (!aacs->uk->uk) {
+        return;
+    }
+
+    num_uks = 0;
+    ukcursor = ce->entry.uk;
+    while (ukcursor) {
+        memcpy(aacs->uk->uk[num_uks].key, ukcursor->key_pair.key, 16);
+
+        BD_DEBUG(DBG_AACS, "Unit key %u from keydb entry: %s\n",
+                 num_uks,
+                 str_print_hex(str, aacs->uk->uk[num_uks].key, 16));
+
+        num_uks++;
+        ukcursor = ukcursor->next;
+    }
+}
 
 static void _keycache_save(AACS *aacs, const char *type, const uint8_t *key, size_t key_size)
 {
@@ -379,6 +513,102 @@ static void _keycache_save(AACS *aacs, const char *type, const uint8_t *key, siz
         }
     }
 }
+
+/*
+ * MMC device access
+ */
+
+static int _mmc_read_auth(AACS *aacs, int type, uint8_t *p1, uint8_t *p2)
+{
+    MMC* mmc = NULL;
+
+    if (!_ensure_config(aacs)) {
+        return AACS_ERROR_NO_CONFIG;
+    }
+
+    if (!(mmc = mmc_open(aacs->path))) {
+        return AACS_ERROR_MMC_OPEN;
+    }
+
+    int error_code = AACS_ERROR_NO_CERT;
+
+    const uint8_t *drive_cert = mmc_get_drive_cert(mmc);
+
+    for (cert_list *hcl = aacs->cf->host_cert_list; hcl ; hcl = hcl->next) {
+
+        char tmp_str[2*92+1];
+        int crypto_error;
+
+        crypto_error = crypto_aacs_verify_host_cert(hcl->host_cert);
+        if (crypto_error) {
+            LOG_CRYPTO_ERROR(DBG_AACS, "host certificate signature verification failed", crypto_error);
+            BD_DEBUG(DBG_AACS, "Not using invalid host certificate %s.\n",
+                  str_print_hex(tmp_str, hcl->host_cert, 92));
+            continue;
+        }
+
+        if (drive_cert && (drive_cert[1] & 0x01) && !(hcl->host_cert[1] & 0x01)) {
+            BD_DEBUG(DBG_AACS, "Certificate (id 0x%s) does not support bus encryption\n",
+                  str_print_hex(tmp_str, hcl->host_cert + 4, 6));
+            //continue;
+        }
+
+        BD_DEBUG(DBG_AACS, "Trying host certificate (id 0x%s)...\n",
+              str_print_hex(tmp_str, hcl->host_cert + 4, 6));
+
+        int mmc_result = mmc_read_auth(mmc, hcl->host_priv_key, hcl->host_cert, type, p1, p2);
+        switch (mmc_result) {
+            case MMC_SUCCESS:
+                mmc_close(mmc);
+                return AACS_SUCCESS;
+            case MMC_ERROR_CERT_REVOKED:
+                error_code = AACS_ERROR_CERT_REVOKED;
+                break;
+            case MMC_ERROR:
+            default:
+                error_code = AACS_ERROR_MMC_FAILURE;
+                break;
+        }
+    }
+
+    mmc_close(mmc);
+
+    return error_code;
+}
+
+static int _read_read_data_key(AACS *aacs)
+{
+    int error_code;
+    char *cache_path = NULL;
+    char str[2*20+1];
+
+    cache_path = str_printf("rdk" DIR_SEP "%s", str_print_hex(str, aacs->drive_cert_hash, 20));
+
+    error_code =_mmc_read_auth(aacs, MMC_READ_DATA_KEYS, aacs->read_data_key, NULL);
+    if (error_code == AACS_SUCCESS) {
+        /* cache read data key */
+        _keycache_save(aacs, cache_path, aacs->read_data_key, 16);
+
+    } else {
+        /* get cached read data key */
+        if (!aacs->no_cache && keycache_find(cache_path, aacs->disc_id, aacs->read_data_key, 16)) {
+            BD_DEBUG(DBG_AACS, "Using cached READ DATA KEY\n");
+            error_code = AACS_SUCCESS;
+        }
+    }
+
+    X_FREE(cache_path);
+
+    if (error_code != AACS_SUCCESS) {
+        BD_DEBUG(DBG_AACS, "Error reading data keys!\n");
+    }
+
+    return error_code;
+}
+
+/*
+ *
+ */
 
 static int _calc_mk(AACS *aacs)
 {
@@ -456,68 +686,6 @@ static int _get_mk(AACS *aacs)
     return result;
 }
 
-/*
- * MMC device access
- */
-
-static int _mmc_read_auth(AACS *aacs, int type, uint8_t *p1, uint8_t *p2)
-{
-    MMC* mmc = NULL;
-
-    if (!_ensure_config(aacs)) {
-        return AACS_ERROR_NO_CONFIG;
-    }
-
-    if (!(mmc = mmc_open(aacs->path))) {
-        return AACS_ERROR_MMC_OPEN;
-    }
-
-    int error_code = AACS_ERROR_NO_CERT;
-
-    const uint8_t *drive_cert = mmc_get_drive_cert(mmc);
-
-    for (cert_list *hcl = aacs->cf->host_cert_list; hcl ; hcl = hcl->next) {
-
-        char tmp_str[2*92+1];
-        int crypto_error;
-
-        crypto_error = crypto_aacs_verify_host_cert(hcl->host_cert);
-        if (crypto_error) {
-            LOG_CRYPTO_ERROR(DBG_AACS, "host certificate signature verification failed", crypto_error);
-            BD_DEBUG(DBG_AACS, "Not using invalid host certificate %s.\n",
-                  str_print_hex(tmp_str, hcl->host_cert, 92));
-            continue;
-        }
-
-        if (drive_cert && (drive_cert[1] & 0x01) && !(hcl->host_cert[1] & 0x01)) {
-            BD_DEBUG(DBG_AACS, "Certificate (id 0x%s) does not support bus encryption\n",
-                  str_print_hex(tmp_str, hcl->host_cert + 4, 6));
-            //continue;
-        }
-
-        BD_DEBUG(DBG_AACS, "Trying host certificate (id 0x%s)...\n",
-              str_print_hex(tmp_str, hcl->host_cert + 4, 6));
-
-        int mmc_result = mmc_read_auth(mmc, hcl->host_priv_key, hcl->host_cert, type, p1, p2);
-        switch (mmc_result) {
-            case MMC_SUCCESS:
-                mmc_close(mmc);
-                return AACS_SUCCESS;
-            case MMC_ERROR_CERT_REVOKED:
-                error_code = AACS_ERROR_CERT_REVOKED;
-                break;
-            case MMC_ERROR:
-            default:
-                error_code = AACS_ERROR_MMC_FAILURE;
-                break;
-        }
-    }
-
-    mmc_close(mmc);
-
-    return error_code;
-}
-
 static int _read_vid(AACS *aacs)
 {
     int error_code = _mmc_read_auth(aacs, MMC_READ_VID, aacs->vid, NULL);
@@ -558,36 +726,6 @@ static int _get_vid(AACS *aacs)
             aacs->poisoned_keys = 1;
             return AACS_SUCCESS;
         }
-    }
-
-    return error_code;
-}
-
-static int _read_read_data_key(AACS *aacs)
-{
-    int error_code;
-    char *cache_path = NULL;
-    char str[2*20+1];
-
-    cache_path = str_printf("rdk" DIR_SEP "%s", str_print_hex(str, aacs->drive_cert_hash, 20));
-
-    error_code =_mmc_read_auth(aacs, MMC_READ_DATA_KEYS, aacs->read_data_key, NULL);
-    if (error_code == AACS_SUCCESS) {
-        /* cache read data key */
-        _keycache_save(aacs, cache_path, aacs->read_data_key, 16);
-
-    } else {
-        /* get cached read data key */
-        if (!aacs->no_cache && keycache_find(cache_path, aacs->disc_id, aacs->read_data_key, 16)) {
-            BD_DEBUG(DBG_AACS, "Using cached READ DATA KEY\n");
-            error_code = AACS_SUCCESS;
-        }
-    }
-
-    X_FREE(cache_path);
-
-    if (error_code != AACS_SUCCESS) {
-        BD_DEBUG(DBG_AACS, "Error reading data keys!\n");
     }
 
     return error_code;
@@ -668,123 +806,6 @@ static int _get_vuk(AACS *aacs, uint8_t *vuk)
     }
 
     return error_code;
-}
-
-static void _find_uk_config_entry(AACS *aacs)
-{
-    const title_entry_list *ce;
-    char str[2*16+1];
-
-    ce = _disc_config_entry(aacs);
-    if (!ce || !ce->entry.uk) {
-        return;
-    }
-
-    BD_DEBUG(DBG_AACS, "Acquire CPS unit keys from keydb config file...\n");
-
-    /* count keys */
-    unsigned num_uks = 0;
-    digit_key_pair_list *ukcursor = ce->entry.uk;
-    while (ukcursor) {
-        num_uks++;
-        ukcursor = ukcursor->next;
-    }
-
-    /* check against Unit_Key_RO.inf */
-    if (num_uks != aacs->uk->num_uk) {
-        BD_DEBUG(DBG_CRIT | DBG_AACS, "Incomplete unit keys in config file (expected %u keys, found %u)\n",
-                 aacs->uk->num_uk, num_uks);
-    }
-
-    /* get keys */
-
-    if (num_uks > aacs->uk->num_uk) {
-        /* config file has more unit keys than the disc has */
-        aacs->uk->num_uk = num_uks;
-    }
-
-    aacs->uk->uk = calloc(aacs->uk->num_uk, sizeof(aacs->uk->uk[0]));
-    if (!aacs->uk->uk) {
-        return;
-    }
-
-    num_uks = 0;
-    ukcursor = ce->entry.uk;
-    while (ukcursor) {
-        memcpy(aacs->uk->uk[num_uks].key, ukcursor->key_pair.key, 16);
-
-        BD_DEBUG(DBG_AACS, "Unit key %u from keydb entry: %s\n",
-                 num_uks,
-                 str_print_hex(str, aacs->uk->uk[num_uks].key, 16));
-
-        num_uks++;
-        ukcursor = ukcursor->next;
-    }
-}
-
-static size_t _read_cci_file(AACS *aacs, int cps_unit, void **data)
-{
-    char   *fname;
-    size_t  size = 0;
-
-    fname = str_printf("AACS" DIR_SEP "CPSUnit%05d.cci", cps_unit);
-    if (fname) {
-        size = _read_file(aacs, fname, data);
-        X_FREE(fname);
-
-        if (size >= 2048) {
-            return size;
-        }
-
-        X_FREE(*data);
-    }
-
-    /* try backup copy */
-
-    fname = str_printf("AACS" DIR_SEP "DUPLICATE" DIR_SEP "CPSUnit%05d.cci", cps_unit);
-    if (fname) {
-        size = _read_file(aacs, fname, data);
-        X_FREE(fname);
-
-        if (size >= 2048) {
-            return size;
-        }
-
-        X_FREE(*data);
-    }
-
-    return 0;
-}
-
-static AACS_CCI *_read_cci(AACS *aacs, int cps_unit)
-{
-    AACS_CCI *cci;
-    void     *data;
-    size_t    size;
-
-    size = _read_cci_file(aacs, cps_unit, &data);
-    if (!size) {
-        BD_DEBUG(DBG_AACS | DBG_CRIT, "Failed to read CPS unit usage file %d\n", cps_unit);
-        return NULL;
-    }
-
-    cci = cci_parse(data, size);
-    X_FREE(data);
-
-    return cci;
-}
-
-static int _check_cci_unencrypted(AACS *aacs, int cps_unit)
-{
-    int result = -1;
-
-    AACS_CCI *cci = _read_cci(aacs, cps_unit);
-    if (cci) {
-        result = cci_is_unencrypted(cci);
-        cci_free(&cci);
-    }
-
-    return result;
 }
 
 static int _calc_uks(AACS *aacs)
@@ -887,27 +908,6 @@ static int _calc_title_hash(AACS *aacs)
 
     X_FREE(data);
     return result;
-}
-
-static CONTENT_CERT *_read_cc_any(AACS *aacs)
-{
-    CONTENT_CERT *cc = NULL;
-    void   *data;
-    size_t  size;
-
-    size = _read_file(aacs, "AACS" DIR_SEP "Content000.cer", &data);
-    if (!size) {
-        size = _read_file(aacs, "AACS" DIR_SEP "Content001.cer", &data);
-    }
-
-    if (size) {
-        cc = cc_parse(data, size);
-        X_FREE(data);
-    } else {
-        BD_DEBUG(DBG_AACS | DBG_CRIT, "Failed to read content certificate file\n");
-    }
-
-    return cc;
 }
 
 static int _get_bus_encryption_enabled(AACS *aacs)
