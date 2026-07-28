@@ -23,7 +23,6 @@
 
 #include "dirs.h"
 
-#include "util/logging.h"
 #include "util/macro.h"
 
 #include <stdio.h>
@@ -73,7 +72,6 @@ char *file_get_data_home(void)
         }
     }
 
-    BD_DEBUG(DBG_FILE, "Can't find user configuration directory !\n");
     return NULL;
 }
 
@@ -101,7 +99,6 @@ const char *file_get_config_system(const char *dir)
                 return appdir;
             }
         }
-        BD_DEBUG(DBG_FILE, "Can't find common configuration directory !\n");
         return NULL;
     } else {
         // next call

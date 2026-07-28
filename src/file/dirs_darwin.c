@@ -30,7 +30,6 @@
 #include <string.h>
 
 #include "util/strutl.h"
-#include "util/logging.h"
 
 #define USER_CFG_DIR   "Library/Preferences"
 #define USER_CACHE_DIR "Library/Caches"
@@ -51,7 +50,6 @@ char *file_get_config_home(void)
         return str_printf("%s/%s", user_home, USER_CFG_DIR);
     }
 
-    BD_DEBUG(DBG_FILE, "Can't find user home directory ($HOME) !\n");
     return NULL;
 }
 
@@ -62,7 +60,6 @@ char *file_get_data_home(void)
         return str_printf("%s/%s", user_home, USER_DATA_DIR);
     }
 
-    BD_DEBUG(DBG_FILE, "Can't find user home directory ($HOME) !\n");
     return NULL;
 }
 
@@ -73,7 +70,6 @@ char *file_get_cache_home(void)
         return str_printf("%s/%s", user_home, USER_CACHE_DIR);
     }
 
-    BD_DEBUG(DBG_FILE, "Can't find user home directory ($HOME) !\n");
     return NULL;
 }
 

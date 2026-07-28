@@ -82,6 +82,7 @@ static char *_config_file_user(const char *file_name)
     char *result;
 
     if (!cfg_dir) {
+        BD_DEBUG(DBG_FILE, "Can't find user home directory !");
         return NULL;
     }
 
@@ -321,6 +322,7 @@ static char *_keycache_file(const char *type, const uint8_t *disc_id)
     char disc_id_str[41];
 
     if (!cache_dir) {
+        BD_DEBUG(DBG_FILE, "Can't find user home directory !");
         return NULL;
     }
 
@@ -413,6 +415,7 @@ static char *_cache_file(const char *name)
     char *result;
 
     if (!cache_dir) {
+        BD_DEBUG(DBG_FILE, "Can't find user home directory !");
         return NULL;
     }
 
