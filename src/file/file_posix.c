@@ -23,7 +23,6 @@
 
 #include "file.h"
 #include "util/macro.h"
-#include "util/logging.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -47,10 +46,8 @@ static void _file_close(AACS_FILE_H *file)
 {
     if (file) {
         if (close((int)(intptr_t)file->internal)) {
-            BD_DEBUG(DBG_CRIT | DBG_FILE, "Error closing POSIX file (%p)\n", (void*)file);
+            //BD_DEBUG(DBG_CRIT | DBG_FILE, "Error closing POSIX file (%p)\n", (void*)file);
         }
-
-        BD_DEBUG(DBG_FILE, "Closed POSIX file (%p)\n", (void*)file);
 
         X_FREE(file);
     }
@@ -60,7 +57,6 @@ static int64_t _file_seek(AACS_FILE_H *file, int64_t offset, int32_t origin)
 {
     off_t result = lseek((int)(intptr_t)file->internal, offset, origin);
     if (result == (off_t)-1) {
-        BD_DEBUG(DBG_FILE, "lseek() failed (%p)\n", (void*)file);
         return -1;
     }
     return (int64_t)result;
@@ -76,7 +72,6 @@ static int64_t _file_read(AACS_FILE_H *file, uint8_t *buf, int64_t size)
     ssize_t got, result;
 
     if (size <= 0 || size >= BD_MAX_SSIZE) {
-        BD_DEBUG(DBG_FILE | DBG_CRIT, "Ignoring invalid read of size %" PRId64 " (%p)\n", size, (void*)file);
         return 0;
     }
 
@@ -84,7 +79,6 @@ static int64_t _file_read(AACS_FILE_H *file, uint8_t *buf, int64_t size)
         result = read((int)(intptr_t)file->internal, buf + got, size - got);
         if (result < 0) {
             if (errno != EINTR) {
-                BD_DEBUG(DBG_FILE, "read() failed (%p)\n", (void*)file);
                 break;
             }
             result = 0;
@@ -103,12 +97,10 @@ static int64_t _file_write(AACS_FILE_H *file, const uint8_t *buf, int64_t size)
     if (size <= 0 || size >= BD_MAX_SSIZE) {
         if (size == 0) {
             if (fsync((int)(intptr_t)file->internal)) {
-                BD_DEBUG(DBG_FILE, "fsync() failed (%p)\n", (void*)file);
                 return -1;
             }
             return 0;
         }
-        BD_DEBUG(DBG_FILE | DBG_CRIT, "Ignoring invalid write of size %" PRId64 " (%p)\n", size, (void*)file);
         return 0;
     }
 
@@ -116,7 +108,6 @@ static int64_t _file_write(AACS_FILE_H *file, const uint8_t *buf, int64_t size)
         result = write((int)(intptr_t)file->internal, buf + written, size - written);
         if (result < 0) {
             if (errno != EINTR) {
-                BD_DEBUG(DBG_FILE, "write() failed (%p)\n", (void*)file);
                 break;
             }
             result = 0;
@@ -147,14 +138,12 @@ static AACS_FILE_H *_file_open(const char* filename, const char *cmode)
 #endif
 
     if ((fd = open(filename, flags, mode)) < 0) {
-        BD_DEBUG(DBG_FILE, "Error opening file %s\n", filename);
         return NULL;
     }
 
     file = calloc(1, sizeof(AACS_FILE_H));
     if (!file) {
         close(fd);
-        BD_DEBUG(DBG_FILE, "Error opening file %s (out of memory)\n", filename);
         return NULL;
     }
 
@@ -165,8 +154,6 @@ static AACS_FILE_H *_file_open(const char* filename, const char *cmode)
     file->tell  = _file_tell;
 
     file->internal = (void*)(intptr_t)fd;
-
-    BD_DEBUG(DBG_FILE, "Opened POSIX file %s (%p)\n", filename, (void*)file);
 
     return file;
 }

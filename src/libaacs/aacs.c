@@ -185,22 +185,24 @@ static void _update_rl(MKB *mkb)
 
 static AACS_FILE_H *_file_open(AACS *aacs, const char *file)
 {
-    AACS_FILE_H *fp;
+    AACS_FILE_H *fp = NULL;
     char        *f_name;
 
     if (aacs->fopen) {
-        return aacs->fopen(aacs->fopen_handle, file);
-    }
-    if (!aacs->path) {
-        return NULL;
+        fp = aacs->fopen(aacs->fopen_handle, file);
+    } else if (aacs->path) {
+        f_name = str_printf("%s" DIR_SEP "%s", aacs->path, file);
+        if (f_name) {
+            fp = file_open(f_name, "rb");
+            X_FREE(f_name);
+        }
     }
 
-    f_name = str_printf("%s" DIR_SEP "%s", aacs->path, file);
-    if (!f_name) {
-        return NULL;
+    if (!fp) {
+        BD_DEBUG(DBG_FILE | DBG_CRIT, "Error opening disc file %s\n", file);
+    } else {
+        BD_DEBUG(DBG_FILE, "Opened disc file %s\n", file);
     }
-    fp = file_open(f_name, "rb");
-    X_FREE(f_name);
 
     return fp;
 }

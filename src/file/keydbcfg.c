@@ -101,6 +101,7 @@ static AACS_FILE_H *_open_cfg_file_user(const char *file_name, char **path, cons
 
     if (*mode == 'w') {
         if (file_mkdirs(cfg_file) < 0) {
+            BD_DEBUG(DBG_FILE | DBG_CRIT, "Error creating directory for %s\n", cfg_file);
             X_FREE(cfg_file);
             return NULL;
         }
@@ -361,7 +362,11 @@ int keycache_save(const char *type, const uint8_t *disc_id, const uint8_t *key, 
                     /* remove if write failed */
                     _file_unlink(file);
                 }
+            } else {
+                BD_DEBUG(DBG_FILE | DBG_CRIT, "Error creating %s\n", file);
             }
+        } else {
+            BD_DEBUG(DBG_FILE | DBG_CRIT, "Error creating cache directory for %s\n", file);
         }
     }
 
@@ -451,7 +456,11 @@ int cache_save(const char *name, uint32_t version, const void *data, uint32_t le
                     /* remove if write failed */
                     _file_unlink(file);
                 }
+            } else {
+                BD_DEBUG(DBG_FILE | DBG_CRIT, "Error creating %s\n", file);
             }
+        } else {
+            BD_DEBUG(DBG_FILE | DBG_CRIT, "Error creating cache directory for %s\n", file);
         }
 
         X_FREE(file);

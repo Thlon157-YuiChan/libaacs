@@ -28,7 +28,6 @@
 
 #include "file.h"
 #include "util/macro.h"
-#include "util/logging.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,10 +39,8 @@ static void _file_close(AACS_FILE_H *file)
 {
     if (file) {
         if (fclose((FILE *)file->internal)) {
-            BD_DEBUG(DBG_FILE | DBG_CRIT, "Error closing WIN32 file (%p)\n", (void*)file);
+            //BD_DEBUG(DBG_FILE | DBG_CRIT, "Error closing WIN32 file (%p)\n", (void*)file);
         }
-
-        BD_DEBUG(DBG_FILE, "Closed WIN32 file (%p)\n", (void*)file);
 
         X_FREE(file);
     }
@@ -72,8 +69,6 @@ static int64_t _file_read(AACS_FILE_H *file, uint8_t *buf, int64_t size)
     if (size > 0 && size < BD_MAX_SSIZE) {
         return (int64_t)fread(buf, 1, (size_t)size, (FILE *)file->internal);
     }
-
-    BD_DEBUG(DBG_FILE | DBG_CRIT, "Ignoring invalid read of size %" PRId64 " (%p)\n", size, (void*)file);
     return 0;
 }
 
@@ -85,13 +80,11 @@ static int64_t _file_write(AACS_FILE_H *file, const uint8_t *buf, int64_t size)
 
     if (size == 0) {
         if (fflush((FILE *)file->internal)) {
-            BD_DEBUG(DBG_FILE, "fflush() failed (%p)\n", (void*)file);
             return -1;
         }
         return 0;
     }
 
-    BD_DEBUG(DBG_FILE | DBG_CRIT, "Ignoring invalid write of size %" PRId64 " (%p)\n", size, (void*)file);
     return 0;
 }
 
@@ -103,20 +96,16 @@ static AACS_FILE_H *_file_open(const char* filename, const char *mode)
 
     if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, filename, -1, wfilename, MAX_PATH) ||
         !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, mode, -1, wmode, 8)) {
-
-        BD_DEBUG(DBG_FILE, "Error opening file %s\n", filename);
         return NULL;
     }
 
     fp = _wfopen(wfilename, wmode);
     if (!fp) {
-        BD_DEBUG(DBG_FILE, "Error opening file %s\n", filename);
         return NULL;
     }
 
     file = calloc(1, sizeof(AACS_FILE_H));
     if (!file) {
-        BD_DEBUG(DBG_FILE | DBG_CRIT, "Error opening file %s (out of memory)\n", filename);
         fclose(fp);
         return NULL;
     }
@@ -128,7 +117,6 @@ static AACS_FILE_H *_file_open(const char* filename, const char *mode)
     file->write    = _file_write;
     file->tell     = _file_tell;
 
-    BD_DEBUG(DBG_FILE, "Opened WIN32 file %s (%p)\n", filename, (void*)file);
     return file;
 }
 

@@ -23,7 +23,6 @@
 
 #include "file.h"
 
-#include "util/logging.h"
 #include "util/macro.h"
 #include "util/strutl.h"
 
@@ -82,10 +81,8 @@ int file_mkdirs(const char *path)
 
         result = file_mkdir(dir);
         if (result < 0) {
-            BD_DEBUG(DBG_FILE | DBG_CRIT, "Error creating directory %s\n", dir);
             break;
         }
-        BD_DEBUG(DBG_FILE, "  created directory %s\n", dir);
     }
 
     X_FREE(dir);
