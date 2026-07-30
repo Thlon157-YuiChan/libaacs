@@ -383,17 +383,6 @@ static int _calc_mk(AACS *aacs)
     MKB *mkb = NULL;
     int result = AACS_ERROR_NO_PK;
 
-    /* already known ? */
-    if (memcmp(aacs->mk, empty_key, 16)) {
-        return AACS_SUCCESS;
-    }
-
-    /* get cached mk */
-    if (!aacs->no_cache && keycache_find("mk", aacs->disc_id, aacs->mk, 16)) {
-        BD_DEBUG(DBG_AACS, "Using cached MK\n");
-        return AACS_SUCCESS;
-    }
-
     BD_DEBUG(DBG_AACS, "Calculate media key...\n");
 
     mkb = _mkb_open(aacs);
@@ -435,7 +424,20 @@ static int _calc_mk(AACS *aacs)
 
 static int _get_mk(AACS *aacs)
 {
-    int result = _calc_mk(aacs);
+    int result;
+
+    /* already known ? */
+    if (memcmp(aacs->mk, empty_key, 16)) {
+        return AACS_SUCCESS;
+    }
+
+    /* get cached mk */
+    if (!aacs->no_cache && keycache_find("mk", aacs->disc_id, aacs->mk, 16)) {
+        BD_DEBUG(DBG_AACS, "Using cached MK\n");
+        return AACS_SUCCESS;
+    }
+
+    result = _calc_mk(aacs);
 
     if (result != AACS_SUCCESS) {
         /* check config entry */
@@ -516,17 +518,6 @@ static int _mmc_read_auth(AACS *aacs, int type, uint8_t *p1, uint8_t *p2)
 
 static int _read_vid(AACS *aacs)
 {
-    /* already known ? */
-    if (memcmp(aacs->vid, empty_key, sizeof(aacs->vid))) {
-        return AACS_SUCCESS;
-    }
-
-    /* get cached vid */
-    if (!aacs->no_cache && keycache_find("vid", aacs->disc_id, aacs->vid, 16)) {
-        BD_DEBUG(DBG_AACS, "Using cached VID\n");
-        return AACS_SUCCESS;
-    }
-
     int error_code = _mmc_read_auth(aacs, MMC_READ_VID, aacs->vid, NULL);
     if (error_code != AACS_SUCCESS) {
         BD_DEBUG(DBG_AACS, "Error reading VID!\n");
@@ -540,7 +531,20 @@ static int _read_vid(AACS *aacs)
 
 static int _get_vid(AACS *aacs)
 {
-    int error_code = _read_vid(aacs);
+    int error_code;
+
+    /* already known ? */
+    if (memcmp(aacs->vid, empty_key, sizeof(aacs->vid))) {
+        return AACS_SUCCESS;
+    }
+
+    /* get cached vid */
+    if (!aacs->no_cache && keycache_find("vid", aacs->disc_id, aacs->vid, 16)) {
+        BD_DEBUG(DBG_AACS, "Using cached VID\n");
+        return AACS_SUCCESS;
+    }
+
+    error_code = _read_vid(aacs);
 
     if (error_code != AACS_SUCCESS) {
         /* check config entry */
@@ -595,18 +599,6 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 {
     int error_code, crypto_err;
 
-    /* already known ? */
-    if (memcmp(vuk, empty_key, 16)) {
-        BD_DEBUG(DBG_AACS, "Using VUK from config file\n");
-        return AACS_SUCCESS;
-    }
-
-    /* get cached vuk */
-    if (!aacs->no_cache && keycache_find("vuk", aacs->disc_id, vuk, 16)) {
-        BD_DEBUG(DBG_AACS, "Using cached VUK\n");
-        return AACS_SUCCESS;
-    }
-
     /* make sure we have media key */
     error_code = _get_mk(aacs);
     if (error_code != AACS_SUCCESS) {
@@ -645,7 +637,21 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 
 static int _get_vuk(AACS *aacs, uint8_t *vuk)
 {
-    int error_code = _calc_vuk(aacs, vuk);
+    int error_code;
+
+    /* already known ? */
+    if (memcmp(vuk, empty_key, 16)) {
+        BD_DEBUG(DBG_AACS, "Using VUK from config file\n");
+        return AACS_SUCCESS;
+    }
+
+    /* get cached vuk */
+    if (!aacs->no_cache && keycache_find("vuk", aacs->disc_id, vuk, 16)) {
+        BD_DEBUG(DBG_AACS, "Using cached VUK\n");
+        return AACS_SUCCESS;
+    }
+
+    error_code = _calc_vuk(aacs, vuk);
 
     if (error_code != AACS_SUCCESS) {
         /* check config entry */
