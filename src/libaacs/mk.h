@@ -20,12 +20,14 @@
 #ifndef AACS_MK_H_
 #define AACS_MK_H_
 
+#include "util/attributes.h"
+
 #include <stdint.h>
 
 struct dk_entry;
 struct pk_entry;
 struct mkb;
 
-int mk_calculate(uint8_t *mk, struct mkb *mkb, struct pk_entry *pkl, struct dk_entry *dkl);
+BD_PRIVATE int mk_calculate(uint8_t *mk, struct mkb *mkb, struct pk_entry *pkl, struct dk_entry *dkl);
 
 #endif /* AACS_KM_H_ */
