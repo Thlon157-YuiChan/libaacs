@@ -317,19 +317,11 @@ void crypto_strerror(int err, char *buf, size_t buf_size)
  *
  */
 
-#if defined(HAVE_STRERROR_R) && defined(HAVE_LIBGPG_ERROR)
-#define LOG_GCRY_ERROR(msg, func, err)                                  \
-  char errstr[100] = {0};                                               \
-  gpg_strerror_r(err, errstr, sizeof(errstr));                          \
-  BD_DEBUG(DBG_AACS|DBG_CRIT, "%s: %s failed. error was: %s\n", func, msg, errstr);
-#else
-#define LOG_GCRY_ERROR(msg, func, err)                                  \
-  BD_DEBUG(DBG_AACS|DBG_CRIT, "%s: %s failed. error was: %s\n", func, msg, gcry_strerror(err));
-#endif
-
 #define GCRY_VERIFY(msg, op)                                \
     if ((err = (op))) {                                     \
-        LOG_GCRY_ERROR(msg, __PRETTY_FUNCTION__, err);      \
+        char errstr[100] = {0};                             \
+        crypto_strerror(err, errstr, sizeof(errstr));       \
+        BD_DEBUG(DBG_AACS|DBG_CRIT, "%s: %s failed. error was: %s\n", __PRETTY_FUNCTION__, msg, errstr); \
         goto error;                                         \
     }
 
