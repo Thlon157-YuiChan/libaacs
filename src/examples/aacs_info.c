@@ -76,7 +76,7 @@ int main (int argc, char **argv)
 #ifdef USE_UDF
     void *udf;
 #endif
-    int show_rl = 0, silent = 0;
+    int show_rl = 0, silent = 0, cache = 1;
 
     /* parse arguments */
 
@@ -88,6 +88,8 @@ int main (int argc, char **argv)
             setenv("AACS_DEBUG_MASK", "0", 1);
 #endif
             silent = 1;
+        } else if (!strcmp(argv[1], "-c")) {
+            cache = 0;
         } else {
             break;
         }
@@ -98,6 +100,7 @@ int main (int argc, char **argv)
     if (argc < 2) {
         fprintf(stderr,
                 "Usage: aacs_info [-r] [-s] <path-to-disc-root> [<path-to-config-file>]\n"
+                "    -c    disable key caching\n"
                 "    -r    show cached revocation lists\n"
                 "    -s    silent mode\n"
                 );
@@ -117,6 +120,7 @@ int main (int argc, char **argv)
     if (udf)
       aacs_set_fopen(aacs, udf, open_udf_file);
 #endif
+    aacs_set_key_caching(aacs, cache);
 
     error_code = aacs_open_device(aacs, argv[1], argc > 2 ? argv[2] : NULL);
 
