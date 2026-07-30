@@ -82,15 +82,10 @@ typedef struct parser_state {
   } hexkey;
 } parser_state;
 
-static dk_list *new_dk_list(void);
-static pk_list *new_pk_list(void);
-static cert_list *new_cert_list(void);
-
 static void add_dk_entry(config_file *cf, char *key, char *node, char *uv, char *u_mask_shift);
 static void add_pk_entry(config_file *cf, char *key);
 static void add_cert_entry(config_file *cf, char *host_priv_key, char *host_cert);
 
-static title_entry_list *new_title_entry_list(void);
 static int add_entry(title_entry_list *list, int type, const char *entry);
 static digit_key_pair_list *new_digit_key_pair_entry(int type, unsigned int digit, const char *key);
 /*
@@ -304,11 +299,13 @@ disc_info
       } else if (!ps->all_discs && (!ps->want_disc_id || !_discid_cmp(ps->want_disc_id, ps->hexkey.u64))) {
         ps->celist = NULL; /* ignore this disc */
       } else {
-        ps->celist = new_title_entry_list();
+        ps->celist = calloc(1, sizeof(*ps->celist));
         if (ps->celist) {
           ps->celist->next = cf->list;
           cf->list = ps->celist;
           hexstring_to_hex_array(ps->celist->entry.discid, 20, ps->hexkey.b);
+        } else {
+          fprintf(stderr, "Error allocating memory for new title entry list!\n");
         }
       }
     }
@@ -635,16 +632,6 @@ int keydbcfg_config_file_close(config_file *cfgfile)
   return 1;
 }
 
-/* Function to return new dk_list object */
-static dk_list *new_dk_list(void)
-{
-  dk_list *dkl = (dk_list *)calloc(1, sizeof(*dkl));
-  if (!dkl) {
-    fprintf(stderr, "Error allocating memory for new certificate list!\n");
-  }
-  return dkl;
-}
-
 /* Function to add dk to config file */
 static void add_dk_entry(config_file *cf, char *key, char *node, char *uv, char *u_mask_shift)
 {
@@ -655,13 +642,14 @@ static void add_dk_entry(config_file *cf, char *key, char *node, char *uv, char 
 
   dk_list *entry = cf->dkl;
   if (!entry) {
-    entry = cf->dkl = new_dk_list();
+    entry = cf->dkl = calloc(1, sizeof(*entry));
   } else {
     for (; entry->next; entry = entry->next);
-    entry->next = new_dk_list();
+    entry->next = calloc(1, sizeof(*entry));
     entry = entry->next;
   }
   if (!entry) {
+    fprintf(stderr, "Error allocating memory for new DK entry!\n");
     goto out;
   }
 
@@ -682,16 +670,6 @@ out:
   X_FREE(u_mask_shift);
 }
 
-/* Function to return new pk_list object */
-static pk_list *new_pk_list(void)
-{
-  pk_list *pkl = (pk_list *)calloc(1, sizeof(*pkl));
-  if (!pkl) {
-    fprintf(stderr, "Error allocating memory for new pk list!\n");
-  }
-  return pkl;
-}
-
 /* Function to add pk to config file */
 static void add_pk_entry(config_file *cf, char *key)
 {
@@ -702,29 +680,21 @@ static void add_pk_entry(config_file *cf, char *key)
 
   pk_list *entry = cf->pkl;
   if (!entry) {
-    entry = cf->pkl = new_pk_list();
+    entry = cf->pkl = calloc(1, sizeof(*entry));
   } else {
     for (; entry->next; entry = entry->next);
-    entry->next = new_pk_list();
+    entry->next = calloc(1, sizeof(*entry));
     entry = entry->next;
   }
 
   if (entry) {
     hexstring_to_hex_array(entry->key, 16, key);
+  } else {
+    fprintf(stderr, "Error allocating memory for new PK entry!\n");
   }
 
 out:
   X_FREE(key);
-}
-
-/* Function to create new certificate list */
-static cert_list *new_cert_list(void)
-{
-  cert_list *list = (cert_list *)calloc(1, sizeof(*list));
-  if (!list) {
-    fprintf(stderr, "Error allocating memory for new certificate list!\n");
-  }
-  return list;
 }
 
 /* Function to add certificate list entry into config file object */
@@ -741,31 +711,23 @@ static void add_cert_entry(config_file *cf, char *host_priv_key, char *host_cert
 
   cert_list *entry = cf->host_cert_list;
   if (!entry) {
-    entry = cf->host_cert_list = new_cert_list();
+    entry = cf->host_cert_list = calloc(1, sizeof(*entry));
   } else {
     for (; entry->next; entry = entry->next);
-    entry->next = new_cert_list();
+    entry->next = calloc(1, sizeof(*entry));
     entry = entry->next;
   }
 
   if (entry) {
     hexstring_to_hex_array(entry->host_priv_key, 20, host_priv_key);
     hexstring_to_hex_array(entry->host_cert, 92, host_cert);
+  } else {
+    fprintf(stderr, "Error allocating memory for new certificate entry!\n");
   }
 
 out:
   X_FREE(host_priv_key);
   X_FREE(host_cert);
-}
-
-/* Function that returns pointer to new title entry list */
-title_entry_list *new_title_entry_list(void)
-{
-  title_entry_list *list = (title_entry_list *)calloc(1, sizeof(*list));
-  if (!list) {
-    fprintf(stderr, "Error allocating memory for new title entry list!\n");
-  }
-  return list;
 }
 
 #define CHECK_KEY_LENGTH(name, len)                               \
