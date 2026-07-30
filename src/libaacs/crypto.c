@@ -55,6 +55,14 @@
 #define GCRYPT_DEBUG 0
 #endif
 
+#if defined(DEBUG) || defined(GCRYPT_DEBUG)
+#  include <assert.h>
+#  define CRYPTO_ASSERT(c) assert(c)
+#else
+#  define CRYPTO_ASSERT(c) do{}while(0)
+#endif
+#define CRYPTO_ASSERT_UNREACHABLE(m) CRYPTO_ASSERT(!(m))
+
 /* Use pthread in libgcrypt */
 #ifdef HAVE_PTHREAD_H
 # if GCRYPT_VERSION_NUMBER < 0x010600
@@ -317,13 +325,20 @@ void crypto_strerror(int err, char *buf, size_t buf_size)
  *
  */
 
+#if defined(DEBUG) || defined(GCRYPT_DEBUG)
 #define GCRY_VERIFY(msg, op)                                \
     if ((err = (op))) {                                     \
         char errstr[100] = {0};                             \
         crypto_strerror(err, errstr, sizeof(errstr));       \
-        BD_DEBUG(DBG_AACS|DBG_CRIT, "%s: %s failed. error was: %s\n", __PRETTY_FUNCTION__, msg, errstr); \
+        fprintf(stderr, "%s: %s failed. error was: %s\n", __PRETTY_FUNCTION__, msg, errstr); \
         goto error;                                         \
     }
+#else
+#define GCRY_VERIFY(msg, op)                                \
+    if ((err = (op))) {                                     \
+        goto error;                                         \
+    }
+#endif
 
 /*
  * build S-expressions
@@ -358,7 +373,7 @@ static gcry_error_t _aacs_sexp_key(gcry_sexp_t *p_sexp_key,
     char          str_Q[sizeof(Q) * 2 + 1];
     gcry_error_t  err;
 
-    BD_ASSERT (key_len == 20 || key_len == 32);
+    CRYPTO_ASSERT (key_len == 20 || key_len == 32);
 
     /* Assign MPI values for ECDSA parameters Q and d.
      * Values are:
@@ -460,7 +475,7 @@ static gcry_error_t _aacs_sexp_hash(gcry_sexp_t *p_sexp_data,
         hash_size = 32;
         break;
     default:
-        BD_ASSERT_UNREACHABLE ("unsupported hash algorithm");
+        CRYPTO_ASSERT_UNREACHABLE ("unsupported hash algorithm");
         return GPG_ERR_UNKNOWN_ALGORITHM;
     }
 
@@ -643,7 +658,7 @@ static int _aacs_verify(const uint8_t *signature, enum gcry_md_algos hash_type,
         key_len = 32;
         break;
     default:
-        BD_ASSERT_UNREACHABLE ("invalid signature algorithm");
+        CRYPTO_ASSERT_UNREACHABLE ("invalid signature algorithm");
         return GPG_ERR_UNSUPPORTED_ALGORITHM;
     }
 
