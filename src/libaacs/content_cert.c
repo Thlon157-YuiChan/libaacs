@@ -113,5 +113,7 @@ CONTENT_CERT *cc_parse(const void *data, size_t len)
 
 void cc_free(CONTENT_CERT **pc)
 {
-    X_FREE(*pc);
+    if (pc && *pc) {
+        X_FREE(*pc);
+    }
 }
