@@ -305,7 +305,7 @@ static int _mmc_check_aacs(MMC *mmc)
     return 0;
 }
 
-static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, int address, int *size)
+static uint8_t *_mmc_read_mkb(MMC *mmc, uint8_t agid, uint32_t address, int *size)
 {
     const int layer = 0;
     uint8_t *mkb = NULL;
@@ -815,7 +815,7 @@ const uint8_t *mmc_get_drive_cert(MMC *mmc)
     return NULL;
 }
 
-uint8_t *mmc_read_mkb(MMC *mmc, int address, int *size)
+uint8_t *mmc_read_mkb(MMC *mmc, uint32_t address, int *size)
 {
     uint8_t agid = 0;
 

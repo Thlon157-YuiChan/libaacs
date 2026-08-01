@@ -43,6 +43,6 @@ BD_PRIVATE int  mmc_read_drive_cert(MMC *mmc, uint8_t *drive_cert);
 BD_PRIVATE const uint8_t *mmc_get_drive_cert(MMC *mmc);
 
 /* read partial MKB */
-BD_PRIVATE uint8_t *mmc_read_mkb(MMC *mmc, int address, int *size);
+BD_PRIVATE uint8_t *mmc_read_mkb(MMC *mmc, uint32_t address, int *size);
 
 #endif /* MMC_H_ */
