@@ -375,16 +375,18 @@ bn_data_list
 
 bn_data
   : DIGIT PUNCT_HYPHEN hexstring_list
-    /*
     {
+      /*
       if (!dkplist)
       {
         dkplist = new_digit_key_pair_list();
         celist->entry.bn = dkplist;
       }
       dkplist = add_digit_key_pair_entry(dkplist, ENTRY_TYPE_BN, $1, $3);
+      */
+      /* not stored, only keep parsing for backward compatibility */
+      X_FREE($3);
     }
-    */
   ;
 
 vuk_entry
@@ -408,16 +410,18 @@ pak_data_list
 
 pak_data
   : DIGIT PUNCT_HYPHEN hexstring_list
-    /*
     {
+      /*
       if (!dkplist)
       {
         dkplist = new_digit_key_pair_list();
         celist->entry.pak = dkplist;
       }
       dkplist = add_digit_key_pair_entry(dkplist, ENTRY_TYPE_PAK, $1, $3);
+      */
+      /* not stored, only keep parsing for backward compatibility */
+      X_FREE($3);
     }
-    */
   ;
 
 tk_entry
@@ -434,16 +438,18 @@ tk_data_list
 
 tk_data
   : DIGIT PUNCT_HYPHEN hexstring_list
-    /*
-  {
+    {
+      /*
       if (!dkplist)
       {
         dkplist = new_digit_key_pair_list();
         celist->entry.tk = dkplist;
       }
       dkplist = add_digit_key_pair_entry(dkplist, ENTRY_TYPE_TK, $1, $3);
+      */
+      /* not stored, only keep parsing for backward compatibility */
+      X_FREE($3);
     }
-    */
   ;
 
 uk_entry
