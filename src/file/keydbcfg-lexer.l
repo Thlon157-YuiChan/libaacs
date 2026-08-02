@@ -18,8 +18,8 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-struct config_file_t *cf;
-struct parser_state *ps;
+struct config_file_t;
+struct parser_state;
 
 #include "keydbcfg-parser.h"
 
