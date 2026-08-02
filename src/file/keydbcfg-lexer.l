@@ -22,6 +22,7 @@ struct config_file_t;
 struct parser_state;
 
 #include "keydbcfg-parser.h"
+#include "file/file.h"
 
 #define YY_NO_UNISTD_H
 
@@ -35,6 +36,18 @@ struct parser_state;
 
 int isatty(int i) { return 0; }
 
+/* Read input from the AACS_FILE_H handle carried in the scanner's extra
+ * field instead of a FILE* (allows using the abstracted file_open()). */
+#define YY_INPUT(buf, result, max_size)                          \
+  do {                                                           \
+    AACS_FILE_H *fp = yyget_extra(yyscanner);                    \
+    int64_t n = fp ? file_read(fp, buf, max_size) : 0;           \
+    if (n < 0) {                                                 \
+      YY_FATAL_ERROR("input in flex scanner failed");            \
+    }                                                            \
+    result = (int)n;                                             \
+  } while (0)
+
 %}
 /* Options to generate reentrant lexer that's POSIX lex compatible. The
  * bison-bridge option is also set since bison forces the use of a parameter
@@ -42,6 +55,7 @@ int isatty(int i) { return 0; }
  * from some BSD distros support bison-bridge as well.
  */
 %option posix-compat reentrant bison-bridge
+%option extra-type="AACS_FILE_H *"
 %option noyywrap
 %option noinput
 %option nounput

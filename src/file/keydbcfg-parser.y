@@ -19,6 +19,7 @@
  */
 
 #include "file/keydbcfg.h"
+#include "file/file.h"
 #include "util/macro.h"
 #include "util/strutl.h"
 #include "util/logging.h"
@@ -26,10 +27,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 #define DBG_PARSER (DBG_FILE|DBG_CRIT)
 
@@ -554,15 +551,7 @@ int keydbcfg_parse_config(config_file *cfgfile, const char *path, const uint8_t 
   if (!cfgfile || !path)
     return 0;
 
-#ifdef _WIN32
-  wchar_t wfilename[MAX_PATH];
-  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wfilename, MAX_PATH)) {
-    return 0;
-  }
-  FILE *fp = _wfopen(wfilename, L"r");
-#else
-  FILE *fp = fopen(path, "r");
-#endif
+  AACS_FILE_H *fp = file_open(path, "r");
   if (!fp)
     return 0;
 
@@ -572,11 +561,11 @@ int keydbcfg_parse_config(config_file *cfgfile, const char *path, const uint8_t 
   }
   void *scanner;
   libaacs_yylex_init(&scanner);
-  libaacs_yyset_in(fp, scanner);
+  libaacs_yyset_extra(fp, scanner);
   int retval = yyparse(scanner, cfgfile, &ps);
   libaacs_yylex_destroy(scanner);
 
-  fclose(fp);
+  file_close(fp);
 
   if (retval)
     return 0;

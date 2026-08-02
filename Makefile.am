@@ -100,6 +100,13 @@ parser_test_SOURCES = \
 	src/file/keydbcfg-lexer.l \
 	src/util/strutl.c \
 	src/util/logging.c
+if HAVE_WIN32
+parser_test_SOURCES += \
+       src/file/file_win32.c
+else
+parser_test_SOURCES += \
+       src/file/file_posix.c
+endif
 parser_test_CFLAGS = -std=c99
 
 uk_dump_SOURCES = \
