@@ -45,7 +45,8 @@ static int _validate_pk(const uint8_t *pk,
                         const uint8_t *cvalue, const uint8_t *uv, const uint8_t *vd,
                         uint8_t *mk)
 {
-    int a, crypto_err;
+    crypto_error_t crypto_err;
+    int a;
     uint8_t dec_vd[16];
     char str[2*16+1];
 
@@ -96,7 +97,7 @@ static uint32_t _calc_v_mask(uint32_t uv)
 static int _calc_pk(const uint8_t *dk, uint8_t *pk, uint32_t uv, uint32_t v_mask, uint32_t dev_key_v_mask)
 {
     unsigned char left_child[16], right_child[16];
-    int crypto_err;
+    crypto_error_t crypto_err;
 
     crypto_err = crypto_aesg3(dk, left_child, right_child, pk);
     if (crypto_err) {

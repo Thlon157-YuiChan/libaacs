@@ -496,8 +496,8 @@ void mmc_close(MMC *mmc)
 static int _verify_signature(const uint8_t *cert, const uint8_t *signature,
                              const uint8_t *nonce, const uint8_t *point)
 {
+    crypto_error_t crypto_error;
     uint8_t data[60];
-    int crypto_error;
 
     memcpy(data,      nonce, 20);
     memcpy(data + 20, point, 40);
@@ -512,8 +512,8 @@ static int _verify_signature(const uint8_t *cert, const uint8_t *signature,
 
 static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, const uint8_t *host_cert, uint8_t *bus_key)
 {
+    crypto_error_t crypto_error;
     uint8_t hks[40], dn[20], dkp[40], dks[40];
-    int crypto_error;
 
     memset(hks, 0, sizeof(hks));
 
@@ -621,7 +621,7 @@ static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, 
 static int _read_vid(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *vid)
 {
     uint8_t mac[16], calc_mac[16];
-    int err;
+    crypto_error_t crypto_error;
 
     BD_DEBUG(DBG_MMC, "Reading VID from drive...\n");
 
@@ -633,9 +633,9 @@ static int _read_vid(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *vi
         }
 
         /* verify MAC */
-        err = crypto_aes_cmac_16(vid, bus_key, calc_mac);
-        if (err) {
-            LOG_CRYPTO_ERROR(DBG_MMC, "VID MAC calculation failed", err);
+        crypto_error = crypto_aes_cmac_16(vid, bus_key, calc_mac);
+        if (crypto_error) {
+            LOG_CRYPTO_ERROR(DBG_MMC, "VID MAC calculation failed", crypto_error);
             return MMC_ERROR;
         }
         if (memcmp(calc_mac, mac, 16)) {
@@ -654,7 +654,7 @@ static int _read_vid(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *vi
 static int _read_pmsn(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *pmsn)
 {
     uint8_t mac[16], calc_mac[16];
-    int err;
+    crypto_error_t crypto_error;
 
     BD_DEBUG(DBG_MMC, "Reading PMSN from drive...\n");
 
@@ -666,9 +666,9 @@ static int _read_pmsn(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *p
         }
 
         /* verify MAC */
-        err = crypto_aes_cmac_16(pmsn, bus_key, calc_mac);
-        if (err) {
-            LOG_CRYPTO_ERROR(DBG_MMC, "PMSN MAC calculation failed", err);
+        crypto_error = crypto_aes_cmac_16(pmsn, bus_key, calc_mac);
+        if (crypto_error) {
+            LOG_CRYPTO_ERROR(DBG_MMC, "PMSN MAC calculation failed", crypto_error);
             return MMC_ERROR;
         }
         if (memcmp(calc_mac, mac, 16)) {
@@ -693,9 +693,9 @@ static int _read_data_keys(MMC *mmc, uint8_t agid, const uint8_t *bus_key,
 
     if (_mmc_read_data_keys(mmc, agid, encrypted_read_data_key, encrypted_write_data_key)) {
         if (read_data_key) {
-            int err = crypto_aes128d(bus_key, encrypted_read_data_key, read_data_key);
-            if (err) {
-                LOG_CRYPTO_ERROR(DBG_MMC, "decrypting read data key failed", err);
+            crypto_error_t crypto_error = crypto_aes128d(bus_key, encrypted_read_data_key, read_data_key);
+            if (crypto_error) {
+                LOG_CRYPTO_ERROR(DBG_MMC, "decrypting read data key failed", crypto_error);
                 return MMC_ERROR;
             }
             if (DEBUG_KEYS) {
@@ -704,9 +704,9 @@ static int _read_data_keys(MMC *mmc, uint8_t agid, const uint8_t *bus_key,
             }
         }
         if (write_data_key) {
-            int err = crypto_aes128d(bus_key, encrypted_write_data_key, write_data_key);
-            if (err) {
-                LOG_CRYPTO_ERROR(DBG_MMC, "decrypting write data key failed", err);
+            crypto_error_t crypto_error = crypto_aes128d(bus_key, encrypted_write_data_key, write_data_key);
+            if (crypto_error) {
+                LOG_CRYPTO_ERROR(DBG_MMC, "decrypting write data key failed", crypto_error);
                 return MMC_ERROR;
             }
             if (DEBUG_KEYS) {
@@ -776,7 +776,7 @@ int mmc_read_auth(MMC *mmc, const uint8_t *host_priv_key, const uint8_t *host_ce
 int mmc_read_drive_cert(MMC *mmc, uint8_t *drive_cert)
 {
     uint8_t buf[96];
-    int crypto_error;
+    crypto_error_t crypto_error;
 
     if (mmc->drive_cert[0] == 0x01) {
         memcpy(drive_cert, mmc->drive_cert, 92);

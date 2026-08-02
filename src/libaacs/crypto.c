@@ -114,9 +114,10 @@ static void _curve_free(elliptic_curve_t *c)
     point_free(&c->G);
 }
 
-BD_USED static int _aesg3(const uint8_t *src_key, uint8_t *dst_key, uint8_t inc)
+BD_USED static gcry_error_t _aesg3(const uint8_t *src_key, uint8_t *dst_key, uint8_t inc)
 {
-    int a, err;
+    gcry_error_t err;
+    unsigned a;
     uint8_t seed[16] = { 0x7B, 0x10, 0x3C, 0x5D, 0xCB, 0x08, 0xC4, 0xE5,
                          0x1A, 0x27, 0xB0, 0x17, 0x99, 0x05, 0x3B, 0xD9 };
     seed[15] += inc;
@@ -133,7 +134,7 @@ BD_USED static int _aesg3(const uint8_t *src_key, uint8_t *dst_key, uint8_t inc)
 }
 
 /* Initializes libgcrypt */
-int crypto_init()
+int crypto_init(void)
 {
     static int crypto_init_check = 0;
 
@@ -162,7 +163,7 @@ int crypto_init()
     return crypto_init_check;
 }
 
-int crypto_aes128e(const uint8_t *key, const uint8_t *data, uint8_t *dst)
+crypto_error_t crypto_aes128e(const uint8_t *key, const uint8_t *data, uint8_t *dst)
 {
     gcry_cipher_hd_t gcry_h;
     gcry_error_t err;
@@ -181,7 +182,7 @@ int crypto_aes128e(const uint8_t *key, const uint8_t *data, uint8_t *dst)
     return err;
 }
 
-int crypto_aes128d(const uint8_t *key, const uint8_t *data, uint8_t *dst)
+crypto_error_t crypto_aes128d(const uint8_t *key, const uint8_t *data, uint8_t *dst)
 {
     gcry_cipher_hd_t gcry_h;
     gcry_error_t err;
@@ -200,9 +201,9 @@ int crypto_aes128d(const uint8_t *key, const uint8_t *data, uint8_t *dst)
     return err;
 }
 
-int crypto_aesg3(const uint8_t *D, uint8_t *lsubk, uint8_t* rsubk, uint8_t *pk)
+crypto_error_t crypto_aesg3(const uint8_t *D, uint8_t *lsubk, uint8_t* rsubk, uint8_t *pk)
 {
-    int err1, err2, err3;
+    gcry_error_t err1, err2, err3;
 
     err1 = _aesg3(D, lsubk, 0);
     err2 = _aesg3(D, pk, 1);
@@ -226,10 +227,10 @@ static void _shl_128(unsigned char *dst, const unsigned char *src)
     }
 }
 
-BD_USED static int _cmac_key(const unsigned char *aes_key, unsigned char *k1, unsigned char *k2)
+BD_USED static crypto_error_t _cmac_key(const unsigned char *aes_key, unsigned char *k1, unsigned char *k2)
 {
+    gcry_error_t err;
     uint8_t key[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-    int err;
 
     err = crypto_aes128e(aes_key, NULL, key);
     if (err)
@@ -248,11 +249,11 @@ BD_USED static int _cmac_key(const unsigned char *aes_key, unsigned char *k1, un
     return err;
 }
 
-int crypto_aes_cmac_16(const unsigned char *data, const unsigned char *aes_key, unsigned char *cmac)
+crypto_error_t crypto_aes_cmac_16(const unsigned char *data, const unsigned char *aes_key, unsigned char *cmac)
 {
+    gcry_error_t err;
     uint8_t k1[16], k2[16];
     unsigned ii;
-    int err;
 
     /*
      * Simplified version of AES CMAC. Supports only 16-byte input data.
@@ -278,7 +279,7 @@ int crypto_aes_cmac_16(const unsigned char *data, const unsigned char *aes_key, 
  *
  */
 
-int crypto_aacs_decrypt(const uint8_t *key, uint8_t *out, size_t out_size, const uint8_t *in, size_t in_size)
+crypto_error_t crypto_aacs_decrypt(const uint8_t *key, uint8_t *out, size_t out_size, const uint8_t *in, size_t in_size)
 {
     static const uint8_t aacs_iv[16]   = { 0x0b, 0xa0, 0xf8, 0xdd, 0xfe, 0xa6, 0x1f, 0xb3,
                                            0xd8, 0xdf, 0x9f, 0x56, 0x6a, 0x05, 0x0f, 0x78 };
@@ -306,7 +307,7 @@ int crypto_aacs_decrypt(const uint8_t *key, uint8_t *out, size_t out_size, const
  *
  */
 
-void crypto_strerror(int err, char *buf, size_t buf_size)
+void crypto_strerror(crypto_error_t err, char *buf, size_t buf_size)
 {
 #if defined(HAVE_STRERROR_R) && defined(HAVE_LIBGPG_ERROR)
   buf[0] = 0;
@@ -563,7 +564,7 @@ error:
  *
  */
 
-int crypto_aacs_sign(const uint8_t *cert, const uint8_t *priv_key, uint8_t *signature,
+crypto_error_t crypto_aacs_sign(const uint8_t *cert, const uint8_t *priv_key, uint8_t *signature,
                      const uint8_t *nonce, const uint8_t *point)
 {
     gcry_sexp_t sexp_key = NULL, sexp_data = NULL, sexp_sig = NULL, sexp_r = NULL, sexp_s = NULL;
@@ -637,7 +638,7 @@ int crypto_aacs_sign(const uint8_t *cert, const uint8_t *priv_key, uint8_t *sign
     return err;
 }
 
-static int _aacs_verify(const uint8_t *signature, enum gcry_md_algos hash_type,
+static gcry_error_t _aacs_verify(const uint8_t *signature, enum gcry_md_algos hash_type,
                         const uint8_t *q_x, const uint8_t *q_y,
                         const uint8_t *data, uint32_t len)
 {
@@ -682,12 +683,12 @@ static int _aacs_verify(const uint8_t *signature, enum gcry_md_algos hash_type,
     return err;
 }
 
-int crypto_aacs_verify(const uint8_t *cert, const uint8_t *signature, const uint8_t *data, uint32_t len)
+crypto_error_t crypto_aacs_verify(const uint8_t *cert, const uint8_t *signature, const uint8_t *data, uint32_t len)
 {
     return _aacs_verify(signature, GCRY_MD_SHA1, cert + 12, cert + 32, data, len);
 }
 
-int crypto_aacs_verify_aacsla(const uint8_t *signature, const uint8_t *data, uint32_t len)
+crypto_error_t crypto_aacs_verify_aacsla(const uint8_t *signature, const uint8_t *data, uint32_t len)
 {
     static const uint8_t aacs_la_pubkey_x[] = {0x63, 0xC2, 0x1D, 0xFF, 0xB2, 0xB2, 0x79, 0x8A, 0x13, 0xB5,
                                                0x8D, 0x61, 0x16, 0x6C, 0x4E, 0x4A, 0xAC, 0x8A, 0x07, 0x72 };
@@ -697,7 +698,7 @@ int crypto_aacs_verify_aacsla(const uint8_t *signature, const uint8_t *data, uin
     return _aacs_verify(signature, GCRY_MD_SHA1, aacs_la_pubkey_x, aacs_la_pubkey_y, data, len);
 }
 
-int  crypto_aacs_verify_aacscc(const uint8_t *signature, const uint8_t *data, uint32_t len)
+crypto_error_t crypto_aacs_verify_aacscc(const uint8_t *signature, const uint8_t *data, uint32_t len)
 {
     static const uint8_t aacs_cc_pubkey_x[] = { 0x78, 0x4C, 0xF5, 0xC3, 0x63, 0x97, 0xA4, 0x39, 0x04, 0x06,
                                                 0xA4, 0x9F, 0x78, 0x00, 0xC7, 0x7D, 0xE9, 0x0C, 0xB3, 0x4C };
@@ -719,7 +720,7 @@ int  crypto_aacs_verify_aacscc(const uint8_t *signature, const uint8_t *data, ui
     return GPG_ERR_UNSUPPORTED_CERT;
 }
 
-static int _aacs_verify_cert(const uint8_t *cert)
+static crypto_error_t _aacs_verify_cert(const uint8_t *cert)
 {
     /* check length byte */
     if (MKINT_BE16(cert+2) != 0x5c) {
@@ -729,7 +730,7 @@ static int _aacs_verify_cert(const uint8_t *cert)
     return crypto_aacs_verify_aacsla(cert + 52, cert, 52);
 }
 
-int crypto_aacs_verify_host_cert(const uint8_t *cert)
+crypto_error_t crypto_aacs_verify_host_cert(const uint8_t *cert)
 {
     switch (cert[0]) {
     case 0x02:
@@ -745,7 +746,7 @@ int crypto_aacs_verify_host_cert(const uint8_t *cert)
     return _aacs_verify_cert(cert);
 }
 
-int crypto_aacs_verify_drive_cert(const uint8_t *cert)
+crypto_error_t crypto_aacs_verify_drive_cert(const uint8_t *cert)
 {
     switch (cert[0]) {
     case 0x01:

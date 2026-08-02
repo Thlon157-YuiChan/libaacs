@@ -105,7 +105,7 @@ static const uint8_t empty_key[32] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
 static int _rl_verify_signature(const uint8_t *rl, size_t size)
 {
-    int crypto_err;
+    crypto_error_t crypto_err;
 
     if (size < 40) {
         BD_DEBUG(DBG_AACS, "too small revocation list\n");
@@ -537,7 +537,7 @@ static int _mmc_read_auth(AACS *aacs, int type, uint8_t *p1, uint8_t *p2)
     for (cert_list *hcl = aacs->cf->host_cert_list; hcl ; hcl = hcl->next) {
 
         char tmp_str[2*92+1];
-        int crypto_error;
+        crypto_error_t crypto_error;
 
         crypto_error = crypto_aacs_verify_host_cert(hcl->host_cert);
         if (crypto_error) {
@@ -737,7 +737,8 @@ static int _get_vid(AACS *aacs)
 
 static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 {
-    int error_code, crypto_err;
+    crypto_error_t crypto_err;
+    int error_code;
 
     /* make sure we have media key */
     error_code = _get_mk(aacs);
@@ -846,7 +847,7 @@ static int _calc_uks(AACS *aacs)
     /* decrypt unit keys */
 
     for (i = 0; i < aacs->uk->num_uk; i++) {
-        int crypto_err;
+        crypto_error_t crypto_err;
 
         /* error out if VUK calculation fails and encrypted CPS unit is found */
         if (vuk_error_code != AACS_SUCCESS) {
@@ -971,16 +972,17 @@ static int _decrypt_unit(AACS *aacs, uint8_t *out_buf, const uint8_t *in_buf, ui
 {
     /* inbuf == NULL means in-place decryption */
 
-    int a, crypto_err;
+    crypto_error_t crypto_error;
+    int a;
     uint8_t key[16];
 
     if (BD_UNLIKELY(in_buf != NULL)) {
         memcpy(out_buf, in_buf, 16); /* first 16 bytes are plain */
     }
 
-    crypto_err = crypto_aes128e(aacs->uk->uk[curr_uk].key, out_buf, key);
-    if (crypto_err) {
-        LOG_CRYPTO_ERROR(DBG_AACS, "unit key derivation failed", crypto_err);
+    crypto_error = crypto_aes128e(aacs->uk->uk[curr_uk].key, out_buf, key);
+    if (crypto_error) {
+        LOG_CRYPTO_ERROR(DBG_AACS, "unit key derivation failed", crypto_error);
         return 1;
     }
 
@@ -989,12 +991,12 @@ static int _decrypt_unit(AACS *aacs, uint8_t *out_buf, const uint8_t *in_buf, ui
     }
 
     if (BD_UNLIKELY(in_buf != NULL)) {
-        crypto_err = crypto_aacs_decrypt(key, out_buf + 16, ALIGNED_UNIT_LEN - 16, in_buf + 16, ALIGNED_UNIT_LEN - 16);
+        crypto_error = crypto_aacs_decrypt(key, out_buf + 16, ALIGNED_UNIT_LEN - 16, in_buf + 16, ALIGNED_UNIT_LEN - 16);
     } else {
-        crypto_err = crypto_aacs_decrypt(key, out_buf + 16, ALIGNED_UNIT_LEN - 16, NULL, 0);
+        crypto_error = crypto_aacs_decrypt(key, out_buf + 16, ALIGNED_UNIT_LEN - 16, NULL, 0);
     }
-    if (crypto_err) {
-        LOG_CRYPTO_ERROR(DBG_AACS, "decrypting unit failed", crypto_err);
+    if (crypto_error) {
+        LOG_CRYPTO_ERROR(DBG_AACS, "decrypting unit failed", crypto_error);
     }
 
     if (_verify_ts(out_buf)) {
@@ -1160,8 +1162,8 @@ void aacs_close(AACS *aacs)
 static void _decrypt_unit_bus(AACS *aacs, uint8_t *buf)
 {
     if (aacs->bee && aacs->bec > 0) {
+        crypto_error_t crypto_err;
         unsigned int i;
-        int crypto_err;
         for (i = 0; i < ALIGNED_UNIT_LEN; i += SECTOR_LEN) {
             //_decrypt_bus(aacs, buf + i);
             crypto_err = crypto_aacs_decrypt(aacs->read_data_key, buf + i + 16, SECTOR_LEN - 16, NULL, 0);
