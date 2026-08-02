@@ -1062,7 +1062,7 @@ AACS *aacs_open2(const char *path, const char *configfile_path, int *error_code)
     return aacs;
 }
 
-AACS *aacs_init()
+AACS *aacs_init(void)
 {
     AACS *aacs;
 
