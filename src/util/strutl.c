@@ -200,9 +200,9 @@ const char *str_next_line(const char *p)
     return p;
 }
 
-static int _str_is_hex_string(const char *str, int len)
+static int _str_is_hex_string(const char *str, size_t len)
 {
-    int ii;
+    size_t ii;
 
     for (ii = 0; ii < len; ii++) {
         if (!isxdigit(str[ii])) {
@@ -227,8 +227,12 @@ static const char *_str_skip_space(const char *p)
     return p;
 }
 
-char *str_get_hex_string(const char *p, int n)
+char *str_get_hex_string(const char *p, size_t n)
 {
+    if (n + 1 < n) {
+        return NULL;
+    }
+
     p = _str_skip_space(p);
 
     if (!_str_is_hex_string(p, n)) {
@@ -244,10 +248,11 @@ char *str_get_hex_string(const char *p, int n)
     return s;
 }
 
-char *str_print_hex(char *out, const uint8_t *buf, int count)
+char *str_print_hex(char *out, const uint8_t *buf, size_t count)
 {
     static const char nibble[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
-    int zz;
+    size_t zz;
+
     for (zz = 0; zz < count; zz++) {
         out[zz*2    ] = nibble[(buf[zz] >> 4) & 0xf];
         out[zz*2 + 1] = nibble[buf[zz] & 0x0f];
