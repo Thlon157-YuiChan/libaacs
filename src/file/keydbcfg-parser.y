@@ -21,6 +21,7 @@
 #include "file/keydbcfg.h"
 #include "util/macro.h"
 #include "util/strutl.h"
+#include "util/logging.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +30,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
+
+#define DBG_PARSER (DBG_FILE|DBG_CRIT)
 
 /* Disable some warnings triggered by generated parser */
 #if defined __GNUC__
@@ -179,7 +182,7 @@ config_entry
   | title_entry
   | error NEWLINE
     {
-      fprintf(stderr, "bad entry at or around line %d\n",
+      BD_DEBUG(DBG_PARSER, "KEYDB.cfg: bad entry at or around line %d\n",
               libaacs_yyget_lineno(scanner) - 1);
       yyerrok;
     }
@@ -294,7 +297,7 @@ disc_info
   : discid PUNCT_EQUALS_SIGN disc_title
     {
       if (ps->hexkey_size != 40) {
-        fprintf(stderr, "Ignoring invalid disc id: %s (len = %zu)\n", $1, ps->hexkey_size);
+        BD_DEBUG(DBG_PARSER, "KEYDB.cfg: ignoring invalid disc id: %s (len = %zu)\n", $1, ps->hexkey_size);
         ps->celist = NULL;
       } else if (!ps->all_discs && (!ps->want_disc_id || !_discid_cmp(ps->want_disc_id, ps->hexkey.u64))) {
         ps->celist = NULL; /* ignore this disc */
@@ -305,7 +308,7 @@ disc_info
           cf->list = ps->celist;
           hexstring_to_hex_array(ps->celist->entry.discid, 20, ps->hexkey.b);
         } else {
-          fprintf(stderr, "Error allocating memory for new title entry list!\n");
+          BD_DEBUG(DBG_PARSER, "Error allocating memory for new title entry list!\n");
         }
       }
     }
@@ -464,7 +467,7 @@ uk_data
         if (ps->celist->entry.uk) {
           /* duplicate entry */
           char disc_id[41];
-          fprintf(stderr, "Ignoring duplicate unit key entry for %s\n",
+          BD_DEBUG(DBG_PARSER, "KEYDB.cfg: ignoring duplicate unit key entry for %s\n",
                   str_print_hex(disc_id, ps->celist->entry.discid, 20));
         } else {
           ps->dkplist = new_digit_key_pair_entry(ENTRY_TYPE_UK, $1, $3);
@@ -484,7 +487,7 @@ hexkey
     {
       size_t len = strlen($2);
       if (ps->hexkey_size + len >= sizeof(ps->hexkey.b)) {
-        fprintf(stderr, "too long key: %s %s\n", ps->hexkey.b, $2);
+        BD_DEBUG(DBG_PARSER, "KEYDB.cfg: too long key: %s %s\n", ps->hexkey.b, $2);
       } else {
         memcpy(ps->hexkey.b + ps->hexkey_size, $2, len + 1);
         ps->hexkey_size += len;
@@ -495,7 +498,7 @@ hexkey
     {
       size_t len = strlen($1);
       if (len >= sizeof(ps->hexkey.b)) {
-        fprintf(stderr, "too long key: %s\n", $1);
+        BD_DEBUG(DBG_PARSER, "KEYDBCFG: too long key: %s\n", $1);
         ps->hexkey.b[0] = 0;
         ps->hexkey_size = 0;
       } else {
@@ -636,7 +639,7 @@ int keydbcfg_config_file_close(config_file *cfgfile)
 static void add_dk_entry(config_file *cf, char *key, char *node, char *uv, char *u_mask_shift)
 {
   if (!key || !node || strlen(key) != 32) {
-    fprintf(stderr, "ignoring bad DK entry %s\n", key);
+    BD_DEBUG(DBG_PARSER, "KEYDB.cfg: ignoring bad DK entry %s\n", key);
     goto out;
   }
 
@@ -649,7 +652,7 @@ static void add_dk_entry(config_file *cf, char *key, char *node, char *uv, char 
     entry = entry->next;
   }
   if (!entry) {
-    fprintf(stderr, "Error allocating memory for new DK entry!\n");
+    BD_DEBUG(DBG_PARSER, "Error allocating memory for new DK entry!\n");
     goto out;
   }
 
@@ -674,7 +677,7 @@ out:
 static void add_pk_entry(config_file *cf, char *key)
 {
   if (!key || strlen(key) != 32) {
-    fprintf(stderr, "ignoring bad PK entry %s\n", key);
+    BD_DEBUG(DBG_PARSER, "KEYDB.cfg: ignoring bad PK entry %s\n", key);
     goto out;
   }
 
@@ -690,7 +693,7 @@ static void add_pk_entry(config_file *cf, char *key)
   if (entry) {
     hexstring_to_hex_array(entry->key, 16, key);
   } else {
-    fprintf(stderr, "Error allocating memory for new PK entry!\n");
+    BD_DEBUG(DBG_PARSER, "Error allocating memory for new pk list!\n");
   }
 
 out:
@@ -701,11 +704,11 @@ out:
 static void add_cert_entry(config_file *cf, char *host_priv_key, char *host_cert)
 {
   if (!host_priv_key || strlen(host_priv_key) != 40) {
-    fprintf(stderr, "ignoring bad private key entry %s\n", host_priv_key);
+    BD_DEBUG(DBG_PARSER, "KEYDB.cfg: ignoring bad private key entry %s\n", host_priv_key);
     goto out;
   }
   if (!host_cert || strlen(host_cert) != 184) {
-    fprintf(stderr, "ignoring bad certificate entry %s\n", host_cert);
+    BD_DEBUG(DBG_PARSER, "KEYDB.cfg: ignoring bad certificate entry %s\n", host_cert);
     goto out;
   }
 
@@ -722,7 +725,7 @@ static void add_cert_entry(config_file *cf, char *host_priv_key, char *host_cert
     hexstring_to_hex_array(entry->host_priv_key, 20, host_priv_key);
     hexstring_to_hex_array(entry->host_cert, 92, host_cert);
   } else {
-    fprintf(stderr, "Error allocating memory for new certificate entry!\n");
+    BD_DEBUG(DBG_PARSER, "Error allocating memory for new certificate list!\n");
   }
 
 out:
@@ -732,7 +735,7 @@ out:
 
 #define CHECK_KEY_LENGTH(name, len)                               \
   if (!entry || strlen(entry) != len) {                           \
-    fprintf(stderr, "Ignoring bad "name" entry %s\n", entry);     \
+    BD_DEBUG(DBG_PARSER, "KEYDB.cfg: Ignoring bad "name" entry %s\n", entry);     \
     break;                                                        \
   }
 
@@ -774,7 +777,7 @@ static int add_entry(title_entry_list *list, int type, const char *entry)
       break;
 
     default:
-      fprintf(stderr, "WARNING: entry type passed in unknown\n");
+      BD_DEBUG(DBG_PARSER, "WARNING: entry type passed in unknown\n");
       return 0;
   }
 
@@ -787,13 +790,13 @@ static digit_key_pair_list *new_digit_key_pair_entry(int type, unsigned int digi
   digit_key_pair_list *list;
 
   if (!key || strlen(key) != 32) {
-    fprintf(stderr, "Ignoring bad UK entry %s\n", key ? key : "<null>");
+    BD_DEBUG(DBG_PARSER, "KEYDB.cfg: Ignoring bad UK entry %s\n", key ? key : "<null>");
     return NULL;
   }
 
   list = (digit_key_pair_list *)calloc(1, sizeof(*list));
   if (!list) {
-    fprintf(stderr, "Error allocating memory for new digit key pair entry list!\n");
+    BD_DEBUG(DBG_PARSER, "Error allocating memory for new digit key pair entry list!\n");
     return NULL;
   }
 
@@ -809,7 +812,7 @@ static int add_date_entry(title_entry_list *list, unsigned int year,
 {
   if (!list)
   {
-    fprintf(stderr, "Error: No title list passed as parameter.\n");
+    BD_DEBUG(DBG_PARSER, "Error: No title list passed as parameter.\n");
     return 0;
   }
 
@@ -824,5 +827,5 @@ static int add_date_entry(title_entry_list *list, unsigned int year,
 /* Our definition of yyerror */
 void yyerror (void *scanner, config_file *cf, parser_state *ps, const char *msg)
 {
-  fprintf(stderr, "%s: line %d\n", msg, libaacs_yyget_lineno(scanner));
+  BD_DEBUG(DBG_PARSER, "KEYDB.cfg: %s: line %d\n", msg, libaacs_yyget_lineno(scanner));
 }
