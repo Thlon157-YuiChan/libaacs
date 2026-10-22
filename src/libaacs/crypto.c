@@ -762,6 +762,55 @@ crypto_error_t crypto_aacs_verify_drive_cert(const uint8_t *cert)
     return _aacs_verify_cert(cert);
 }
 
+/*
+ * AES Hashing Function (AES-H)
+ *
+ * AACS Common Book, section 2.1.4. The data is padded using the standard
+ * SHA-1 method and then hashed block by block with AES-G.
+ */
+
+void crypto_aes_h(const uint8_t *x, uint64_t len, uint8_t *hash)
+{
+    static const uint8_t h0[16] = {
+        0x2D, 0xC2, 0xDF, 0x39, 0x42, 0x03, 0x21, 0xD0,
+        0xCE, 0xF1, 0xFE, 0x23, 0x74, 0x02, 0x9D, 0x95
+    };
+    uint8_t  h[16], tmp[16];
+    uint64_t bitlen = len * 8;
+    uint64_t total = len + 1 + 8;
+    uint64_t pad   = (128 - (total % 128)) % 128;
+    uint64_t plen  = total + pad;
+    uint8_t *buf;
+    uint64_t off;
+    int      i;
+
+    buf = malloc((size_t)plen);
+    if (!buf) {
+        memset(hash, 0, 16);
+        return;
+    }
+    if (len) {
+        memcpy(buf, x, (size_t)len);
+    }
+    buf[len] = 0x80;
+    memset(buf + len + 1, 0, (size_t)pad);
+    for (i = 0; i < 8; i++) {
+        buf[plen - 1 - i] = (uint8_t)(bitlen >> (8 * i));
+    }
+
+    memcpy(h, h0, sizeof(h));
+    for (off = 0; off < plen; off += 16) {
+        crypto_aes128d(buf + off, h, tmp);
+        for (i = 0; i < 16; i++) {
+            h[i] = tmp[i] ^ h[i];
+        }
+    }
+    memcpy(hash, h, sizeof(h));
+
+    memset(buf, 0, (size_t)plen);
+    free(buf);
+}
+
 void crypto_aacs_title_hash(const uint8_t *ukf, uint64_t len, uint8_t *hash)
 {
     gcry_md_hash_buffer(GCRY_MD_SHA1, hash, ukf, len);

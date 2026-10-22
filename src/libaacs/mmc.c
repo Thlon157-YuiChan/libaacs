@@ -93,6 +93,7 @@ typedef enum {
     MMC_REPORT_KEY_AACS_DRIVE_CERT_CHALLENGE = 0x01,
     MMC_REPORT_KEY_AACS_DRIVE_KEY            = 0x02,
     MMC_REPORT_KEY_AACS_DRIVE_CERTIFICATE    = 0x38,
+    MMC_REPORT_KEY_AACS_BINDING_NONCE       = 0x21,
     MMC_REPORT_KEY_AACS_INVALIDATE_AGID      = 0x3f,
 } MMC_REPORT_KEY_format_aacs;
 
@@ -453,11 +454,12 @@ MMC *mmc_open(const char *path)
     }
 
     if (!_mmc_check_aacs(mmc)) {
-        BD_DEBUG(DBG_MMC | DBG_CRIT, "AACS not active or supported by the drive\n");
-#ifndef _WIN32
-        mmc_close (mmc);
-        return NULL;
-#endif
+        /*
+         * Not all drives report the AACS feature descriptor in their
+         * configuration. The actual AACS support is verified when the
+         * keys are read, so this is not fatal.
+         */
+        BD_DEBUG(DBG_MMC, "AACS feature descriptor not reported by the drive\n");
     }
 
     if (mmc->aacs_version > 1) {
@@ -618,6 +620,36 @@ static int _mmc_aacs_auth(MMC *mmc, uint8_t agid, const uint8_t *host_priv_key, 
  *
  */
 
+/*
+ * Read the Binding Nonce of the protected area (AACS Common Book 4.14.2.5).
+ *
+ * The Binding Nonce is used to calculate the Protected Area Key of
+ * recordable media.
+ */
+
+static int _read_binding_nonce(MMC *mmc, uint8_t agid, uint8_t *nonce)
+{
+    uint8_t buf[64];
+    memset(buf, 0, sizeof(buf));
+
+    BD_DEBUG(DBG_MMC, "Reading Binding Nonce from drive...\n");
+
+    if (!_mmc_report_key(mmc, agid, 0, 0, MMC_REPORT_KEY_AACS_BINDING_NONCE,
+                         buf, sizeof(buf))) {
+        BD_DEBUG(DBG_MMC | DBG_CRIT, "Unable to read Binding Nonce from drive!\n");
+        return MMC_ERROR;
+    }
+
+    memcpy(nonce, buf + 4, 16);
+
+    if (DEBUG_KEYS) {
+        char str[2*16+1];
+        BD_DEBUG(DBG_MMC, "Binding Nonce        : %s\n", str_print_hex(str, nonce, 16));
+    }
+
+    return MMC_SUCCESS;
+}
+
 static int _read_vid(MMC *mmc, uint8_t agid, const uint8_t *bus_key, uint8_t *vid)
 {
     uint8_t mac[16], calc_mac[16];
@@ -754,6 +786,9 @@ int mmc_read_auth(MMC *mmc, const uint8_t *host_priv_key, const uint8_t *host_ce
             break;
         case MMC_READ_PMSN:
             error_code = _read_pmsn(mmc, agid, bus_key, p1);
+            break;
+        case MMC_READ_BINDING_NONCE:
+            error_code = _read_binding_nonce(mmc, agid, p1);
             break;
         case MMC_READ_DATA_KEYS:
             error_code = _read_data_keys(mmc, agid, bus_key, p1, p2);

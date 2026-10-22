@@ -34,6 +34,7 @@ typedef struct mmc MMC;
 #define MMC_READ_VID            0
 #define MMC_READ_PMSN           1
 #define MMC_READ_DATA_KEYS      2
+#define MMC_READ_BINDING_NONCE  3
 
 BD_PRIVATE MMC *mmc_open(const char *path);
 BD_PRIVATE void mmc_close(MMC *mmc);

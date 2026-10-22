@@ -66,6 +66,10 @@ struct aacs {
 
     /* VID is cached for BD-J */
     uint8_t   vid[16];
+    /* AACS for recorded content (BD-RE / BDAV) */
+    int       is_recordable;
+    uint8_t   binding_nonce[16];
+    uint8_t   usage_rules[16];
     /* PMSN is cached for BD-J */
     uint8_t   pmsn[16];
     /* Media key is cached for BD+ */
@@ -277,12 +281,31 @@ static size_t _read_mkb_file(AACS *aacs, const char *file, void **pdata)
 
     do {
         int64_t read_size = chunk_size;
+        int     truncated = 0;
+
+        /*
+         * The record length covers the record header as well, so the
+         * last record of the file is shorter than its length. Never read
+         * past the end of the file.
+         */
+        if (read_size > fsize - size) {
+            read_size = fsize - size;
+            truncated = 1;
+        }
+        if (read_size < 4) {
+            break;
+        }
+
         if (file_read(fp, data + size, read_size) != read_size) {
             BD_DEBUG(DBG_AACS | DBG_CRIT, "Failed reading %s\n", file);
             X_FREE(data);
             break;
         }
         size += read_size;
+        if (truncated) {
+            /* last record of the file */
+            break;
+        }
         chunk_size = MKINT_BE24(data + size - 4 + 1);
         if (fsize - size + 4 < (int64_t)chunk_size) {
             BD_DEBUG(DBG_AACS | DBG_CRIT, "Invalid record size %u in %s\n", (unsigned)chunk_size, file);
@@ -319,6 +342,16 @@ static MKB *_mkb_open(AACS *aacs)
         size = _read_mkb_file(aacs, "AACS" DIR_SEP "DUPLICATE" DIR_SEP "MKB_RO.inf", &data);
     }
     if (size < 4) {
+        /* AACS for recorded content. The media key block is stored in
+         * the media itself. */
+        X_FREE(data);
+        size = _read_mkb_file(aacs, "AACS" DIR_SEP "MKB_RW.inf", &data);
+        if (size >= 4) {
+            BD_DEBUG(DBG_AACS, "Using read/write MKB (recorded content)\n");
+            aacs->is_recordable = 1;
+        }
+    }
+    if (size < 4) {
         X_FREE(data);
         BD_DEBUG(DBG_AACS | DBG_CRIT, "Error reading MKB file (AACS/MKB_RO.inf)\n");
         return NULL;
@@ -346,6 +379,22 @@ static size_t _read_cci_file(AACS *aacs, int cps_unit, void **data)
         }
 
         X_FREE(*data);
+    }
+
+    /* AACS for recorded content */
+
+    if (aacs->is_recordable) {
+        fname = str_printf("AACS" DIR_SEP "AACS_av" DIR_SEP "CPSUnit%05d.cci", cps_unit);
+        if (fname) {
+            size = _read_file(aacs, fname, data);
+            X_FREE(fname);
+
+            if (size >= 2048) {
+                return size;
+            }
+
+            X_FREE(*data);
+        }
     }
 
     /* try backup copy */
@@ -732,6 +781,58 @@ static int _get_vid(AACS *aacs)
 }
 
 /*
+ * AACS for recorded content (BD-RE / BDAV)
+ *
+ * The recorded variant of AACS protects the content with a Title Key that
+ * is bound to the media. The Title Key is calculated from the Protected
+ * Area Key, which in turn is calculated from the Media Key and the Binding
+ * Nonce stored in the protected area of the media.
+ *
+ * AACS Recordable Video Book, sections 3.2 (Protected Area Key) and
+ * 3.4 (Decryption).
+ */
+
+static int _get_binding_nonce(AACS *aacs)
+{
+    int error_code;
+
+    if (memcmp(aacs->binding_nonce, empty_key, sizeof(aacs->binding_nonce))) {
+        return AACS_SUCCESS;
+    }
+
+    error_code = _mmc_read_auth(aacs, MMC_READ_BINDING_NONCE, aacs->binding_nonce, NULL);
+    if (error_code != AACS_SUCCESS) {
+        BD_DEBUG(DBG_AACS, "Error reading Binding Nonce!\n");
+    }
+
+    return error_code;
+}
+
+/*
+ * The Usage Rules are stored in the CPS Unit Usage File. They are bound to
+ * the Title Key by XORing AES-H(Usage Rules) into it.
+ */
+
+static int _calc_usage_rules(AACS *aacs, int cps_unit, uint8_t *hash)
+{
+    void   *data = NULL;
+    size_t  size;
+
+    size = _read_cci_file(aacs, cps_unit, &data);
+    if (size < 16) {
+        X_FREE(data);
+        BD_DEBUG(DBG_AACS | DBG_CRIT, "Error reading CPS Unit Usage File\n");
+        return AACS_ERROR_CORRUPTED_DISC;
+    }
+
+    crypto_aes_h((const uint8_t *)data, size, hash);
+
+    X_FREE(data);
+
+    return AACS_SUCCESS;
+}
+
+/*
  * Unit key calculation
  */
 
@@ -739,6 +840,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 {
     crypto_error_t crypto_err;
     int error_code;
+    const uint8_t *bind_data;
 
     /* make sure we have media key */
     error_code = _get_mk(aacs);
@@ -746,15 +848,26 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
         return error_code;
     }
 
-    /* acquire VID */
-    error_code = _get_vid(aacs);
-    if (error_code != AACS_SUCCESS) {
-        return error_code;
+    if (aacs->is_recordable) {
+        /* AACS for recorded content: the Protected Area Key is calculated
+         * from the Media Key and the Binding Nonce. */
+        error_code = _get_binding_nonce(aacs);
+        if (error_code != AACS_SUCCESS) {
+            return error_code;
+        }
+        bind_data = aacs->binding_nonce;
+    } else {
+        /* acquire VID */
+        error_code = _get_vid(aacs);
+        if (error_code != AACS_SUCCESS) {
+            return error_code;
+        }
+        bind_data = aacs->vid;
     }
 
-    /* calculate VUK */
+    /* calculate VUK / Kpa */
 
-    crypto_err = crypto_aes128d(aacs->mk, aacs->vid, vuk);
+    crypto_err = crypto_aes128d(aacs->mk, bind_data, vuk);
     if (crypto_err) {
         LOG_CRYPTO_ERROR(DBG_AACS, "decrypting VUK failed", crypto_err);
         return AACS_ERROR_UNKNOWN;
@@ -762,7 +875,7 @@ static int _calc_vuk(AACS *aacs, uint8_t *vuk)
 
     int a;
     for (a = 0; a < 16; a++) {
-        vuk[a] ^= aacs->vid[a];
+        vuk[a] ^= bind_data[a];
     }
 
     char str[2*16+1];
@@ -864,6 +977,25 @@ static int _calc_uks(AACS *aacs)
             return AACS_ERROR_UNKNOWN;
         }
 
+        if (aacs->is_recordable) {
+            /*
+             * AACS for recorded content:
+             *   Kt = AES-128D(Kpa, Kte) XOR AES-H(Usage Rules)
+             * The Usage Rules are stored in the CPS Unit Usage File of the
+             * corresponding CPS unit.
+             */
+            uint8_t usage[16];
+            unsigned int j;
+
+            error_code = _calc_usage_rules(aacs, i + 1, usage);
+            if (error_code != AACS_SUCCESS) {
+                return error_code;
+            }
+            for (j = 0; j < 16; j++) {
+                aacs->uk->uk[i].key[j] ^= usage[j];
+            }
+        }
+
         char str[2*16+1];
         BD_DEBUG(DBG_AACS, "Unit key %d: %s\n", i,
                  str_print_hex(str, aacs->uk->uk[i].key, 16));
@@ -894,6 +1026,19 @@ static int _calc_title_hash(AACS *aacs)
         size = _read_file(aacs, "AACS" DIR_SEP "DUPLICATE" DIR_SEP "Unit_Key_RO.inf", &data);
         if (size > 2048) {
             aacs->uk = uk_parse(data, size, aacs2);
+        }
+    }
+
+    /* failed, try AACS for recorded content */
+    if (!aacs->uk) {
+        X_FREE(data);
+        size = _read_file(aacs, "AACS" DIR_SEP "AACS_av" DIR_SEP "Unit_Key_RW.inf", &data);
+        if (size > 2048) {
+            aacs->uk = uk_parse(data, size, aacs2);
+            if (aacs->uk) {
+                BD_DEBUG(DBG_AACS, "Using recorded content unit key file\n");
+                aacs->is_recordable = 1;
+            }
         }
     }
 

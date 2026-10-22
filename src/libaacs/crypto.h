@@ -50,6 +50,7 @@ BD_PRIVATE crypto_error_t crypto_aacs_sign(const uint8_t *cert, const uint8_t *p
                                  uint8_t *signature,
                                  const uint8_t *nonce, const uint8_t *point) BD_USED;
 BD_PRIVATE void crypto_aacs_title_hash(const uint8_t *ukf, uint64_t len, uint8_t *hash);
+BD_PRIVATE void crypto_aes_h(const uint8_t *x, uint64_t len, uint8_t *hash);
 
 BD_PRIVATE crypto_error_t crypto_aacs_verify(const uint8_t *cert, const uint8_t *signature, const uint8_t *data, uint32_t len) BD_USED;
 BD_PRIVATE crypto_error_t crypto_aacs_verify_aacsla(const uint8_t *signature, const uint8_t *data, uint32_t len) BD_USED;
