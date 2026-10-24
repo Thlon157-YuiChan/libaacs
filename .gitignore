@@ -32,3 +32,4 @@ src/file/keydbcfg-lexer.c
 src/file/keydbcfg-parser.c
 src/file/keydbcfg-parser.h
 stamp-h1
+KEYDB.cfg
